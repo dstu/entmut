@@ -1,0 +1,4 @@
+[package]
+name = "rust_tree"
+version = "0.0.1"
+authors = [ "Stu Black <trurl@freeshell.org>" ]
