@@ -450,16 +450,16 @@ mod tests {
                                         Tree::leaf("three")]).zipper();
         assert!(z1 == z2);
         assert!(z1 != Tree::leaf("head").zipper());
-        assert!(z1 !=Tree::new("blarg", vec![Tree::leaf("one"),
-                                             Tree::leaf("two"),
-                                             Tree::leaf("three")]).zipper());
+        assert!(z1 != Tree::new("blarg", vec![Tree::leaf("one"),
+                                              Tree::leaf("two"),
+                                              Tree::leaf("three")]).zipper());
     }
 
     #[test]
     fn test_trivial_clone() {
         let t1 = Tree::new("head", vec![Tree::leaf("one"),
-                                                Tree::leaf("two"),
-                                                Tree::leaf("three")]);
+                                        Tree::leaf("two"),
+                                        Tree::leaf("three")]);
         assert_eq!(t1, t1.clone());
     }
 
