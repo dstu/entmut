@@ -1,4 +1,4 @@
-use std::fmt::{FormatError, Formatter, Show};
+use std::fmt::{Error, Formatter, Show};
 
 pub struct Tree<T> {
     pub data: T,
@@ -66,7 +66,7 @@ impl<T> Tree<T> {
 }
 
 impl<T: Show> Show for Tree<T> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         enum Walk<T> {
             Down(T),
             Up,
@@ -78,7 +78,7 @@ impl<T: Show> Show for Tree<T> {
         }
         stack.push(Walk::Up);
         for c in self.children.iter().rev() {
-            stack.push(Down(c));
+            stack.push(Walk::Down(c));
         }
         loop {
             match stack.pop() {
@@ -90,9 +90,9 @@ impl<T: Show> Show for Tree<T> {
                 Some(Walk::Down(t)) => match write!(f, " ({}", t.data) {
                     Err(e) => return Err(e),
                     _ => {
-                        stack.push(Up);
+                        stack.push(Walk::Up);
                         for c in t.children.iter().rev() {
-                            stack.push(Down(c));
+                            stack.push(Walk::Down(c));
                         }
                     },
                 },
@@ -138,10 +138,9 @@ impl<T: PartialEq> PartialEq for Tree<T> {
                         }
                     }
                 },
-                None => break,
+                None => return true,
             }
         }
-        return true;
     }
 }
 
@@ -293,6 +292,21 @@ impl<T> Zipper<T> {
             true
         } else {
             false
+        }
+    }
+
+    pub fn to_push_child_front(self, child: Tree<T>) -> Zipper<T> {
+        match self.to_push_child_at(0, child) {
+            Some(z) => z,
+            None => panic!("Unable to add child"),
+        }
+    }
+
+    pub fn to_push_child_back(self, child: Tree<T>) -> Zipper<T> {
+        let target_index = self.here.children.len() - 1;
+        match self.to_push_child_at(target_index, child) {
+            Some(z) => z,
+            None => panic!("Unable to add child"),
         }
     }
 
@@ -469,6 +483,82 @@ mod tests {
                                         Tree::leaf("two"),
                                         Tree::leaf("three")]);
         assert_eq!(t1.to_string(), 
+                   "(head (one) (two) (three))".to_string());
+    }
+
+    #[test]
+    fn test_trivial_zipping() {
+        let mut z = Tree::leaf("head").zipper();
+        assert_eq!(z.here.to_string(), "(head)".to_string());
+        assert_eq!(z.clone().to_root().here.to_string(), 
+                   "(head)".to_string());
+        z = z.to_push_child_front(Tree::leaf("two"));
+        assert_eq!(z.here.to_string(), "(two)".to_string());
+        assert_eq!(z.clone().to_root().here.to_string(),
+                   "(head (two))".to_string());
+        z = z.to_push_left(Tree::leaf("one"));
+        assert_eq!(z.here.to_string(), "(one)".to_string());
+        assert_eq!(z.clone().to_root().here.to_string(),
+                   "(head (one) (two))".to_string());
+        z = match z.to_right() {
+            x => {
+                assert!(x.is_new());
+                x.unwrap()
+            }
+        };
+        assert_eq!(z.clone().to_root().here.to_string(),
+                   "(head (one) (two))".to_string());
+
+        z.push_right(Tree::leaf("three"));
+        assert_eq!(z.here.to_string(), "(two)".to_string());
+        assert_eq!(z.clone().to_root().here.to_string(),
+                   "(head (one) (two) (three))".to_string());
+
+        z = match z.to_right() {
+            x => {
+                assert!(x.is_new());
+                x.unwrap()
+            }
+        };
+        assert_eq!(z.here.to_string(), "(three)".to_string());
+        assert_eq!(z.clone().to_root().here.to_string(),
+                   "(head (one) (two) (three))".to_string());
+
+        z = match z.to_right() {
+            x => {
+                assert!(x.is_old());
+                x.unwrap()
+            }
+        };
+
+        z = match z.to_left() {
+            x => {
+                assert!(x.is_new());
+                x.unwrap()
+            }
+        };
+        assert_eq!(z.here.to_string(), "(two)".to_string());
+        assert_eq!(z.clone().to_root().here.to_string(),
+                   "(head (one) (two) (three))".to_string());
+
+        z = match z.to_left() {
+            x => {
+                assert!(x.is_new());
+                x.unwrap()
+            }
+        };
+        assert_eq!(z.here.to_string(), "(one)".to_string());
+        assert_eq!(z.clone().to_root().here.to_string(),
+                   "(head (one) (two) (three))".to_string());
+
+        z = match z.to_left() {
+            x => {
+                assert!(x.is_old());
+                x.unwrap()
+            }
+        };
+        assert_eq!(z.here.to_string(), "(one)".to_string());
+        assert_eq!(z.clone().to_root().here.to_string(),
                    "(head (one) (two) (three))".to_string());
     }
 }
