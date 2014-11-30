@@ -19,15 +19,15 @@ pub enum Modified<T> {
 
 impl<T> Modified<T> {
     pub fn is_new(&self) -> bool {
-        match *self {
-            Modified::New(z) => true,
+        match self {
+            &Modified::New(_) => true,
             _ => false,
         }
     }
 
     pub fn is_old(&self) -> bool {
-        match *self {
-            Modified::Old(z) => true,
+        match self {
+            &Modified::Old(_) => true,
             _ => false,
         }
     }
@@ -67,17 +67,37 @@ impl<T> Tree<T> {
 
 impl<T: Show> Show for Tree<T> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
+        enum Walk<T> {
+            Down(T),
+            Up,
+        };
+        let mut stack = Vec::new();
         match write!(f, "({}", self.data) {
             Err(e) => return Err(e),
             _ => (),
         }
-        for c in self.children.iter() {
-            match write!(f, " {}", c) {
-                Err(e) => return Err(e),
-                _ => (),
+        stack.push(Walk::Up);
+        for c in self.children.iter().rev() {
+            stack.push(Down(c));
+        }
+        loop {
+            match stack.pop() {
+                None => return Ok(()),
+                Some(Walk::Up) => match write!(f, ")") {
+                    Err(e) => return Err(e),
+                    _ => (),
+                },
+                Some(Walk::Down(t)) => match write!(f, " ({}", t.data) {
+                    Err(e) => return Err(e),
+                    _ => {
+                        stack.push(Up);
+                        for c in t.children.iter().rev() {
+                            stack.push(Down(c));
+                        }
+                    },
+                },
             }
         }
-        write!(f, ")")
     }
 }
 
@@ -92,6 +112,36 @@ impl<T: Clone> Clone for Tree<T> {
     fn clone_from(&mut self, source: &Tree<T>) {
         self.data.clone_from(&source.data);
         self.children.clone_from(&source.children);
+    }
+}
+
+impl<T: PartialEq> PartialEq for Tree<T> {
+    fn eq(&self, other: &Tree<T>) -> bool {
+        let mut stack = Vec::new();
+        stack.push((self, other));
+        loop {
+            match stack.pop() {
+                Some((x, y)) => {
+                    if x.data != y.data {
+                        return false;
+                    } else if x.children.len() != y.children.len() {
+                        return false;
+                    } else {
+                        let mut xi = x.children.iter();
+                        let mut yi = y.children.iter();
+                        loop {
+                            match (xi.next(), yi.next()) {
+                                (Some(xt), Some(yt)) => stack.push((xt, yt)),
+                                (None, None) => break,
+                                _ => panic!("Tree corruption"),
+                            }
+                        }
+                    }
+                },
+                None => break,
+            }
+        }
+        return true;
     }
 }
 
@@ -337,5 +387,88 @@ impl<T: Clone> Clone for Zipper<T> {
         self.lefts = source.lefts.clone();
         self.rights = source.rights.clone();
         self.parent_path = source.parent_path.clone();
+    }
+}
+
+impl<T: PartialEq> PartialEq for Zipper<T> {
+    fn eq(&self, other: &Zipper<T>) -> bool {
+        self.here == other.here
+            && self.lefts == other.lefts
+            && self.rights == other.rights
+            && self.parent_path == other.parent_path
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+
+    use super::Tree;
+
+    #[test]
+    fn test_new() {
+        let t = Tree::new("head", vec![Tree::leaf("one"),
+                                       Tree::leaf("two"),
+                                       Tree::leaf("three")]);
+        assert_eq!(t.data, "head");
+        assert_eq!(t.children, vec![Tree::leaf("one"),
+                                    Tree::leaf("two"),
+                                    Tree::leaf("three")]);
+    }
+
+    #[test]
+    fn test_leaf() {
+        let t = Tree::leaf("asdf");
+        assert_eq!(t.data, "asdf");
+        assert_eq!(t.children.len(), 0);
+    }
+
+    #[test]
+    fn test_trivial_tree_equality() {
+        let t1 = Tree::new("head", vec![Tree::leaf("one"),
+                                        Tree::leaf("two"),
+                                        Tree::leaf("three")]);
+        let t2 = Tree::new("head", vec![Tree::leaf("one"),
+                                        Tree::leaf("two"),
+                                        Tree::leaf("three")]);
+        assert_eq!(t1, t2);
+        assert_eq!(t1, t1);
+        assert_eq!(t2, t2);
+        assert!(t1 != Tree::leaf("head"));
+        assert!(t1 != Tree::new("blarg", vec![Tree::leaf("one"),
+                                              Tree::leaf("two"),
+                                              Tree::leaf("three")]));
+    }
+
+    #[test]
+    fn test_trivial_zipper_equality() {
+        let z1 = Tree::new("head", vec![Tree::leaf("one"),
+                                        Tree::leaf("two"),
+                                        Tree::leaf("three")]).zipper();
+        let z2 = Tree::new("head", vec![Tree::leaf("one"),
+                                        Tree::leaf("two"),
+                                        Tree::leaf("three")]).zipper();
+        assert!(z1 == z2);
+        assert!(z1 != Tree::leaf("head").zipper());
+        assert!(z1 !=Tree::new("blarg", vec![Tree::leaf("one"),
+                                             Tree::leaf("two"),
+                                             Tree::leaf("three")]).zipper());
+    }
+
+    #[test]
+    fn test_trivial_clone() {
+        let t1 = Tree::new("head", vec![Tree::leaf("one"),
+                                                Tree::leaf("two"),
+                                                Tree::leaf("three")]);
+        assert_eq!(t1, t1.clone());
+    }
+
+    #[test]
+    fn test_trivial_show() {
+        let t1 = Tree::new("head", vec![Tree::leaf("one"),
+                                        Tree::leaf("two"),
+                                        Tree::leaf("three")]);
+        assert_eq!(t1.to_string(), 
+                   "(head (one) (two) (three))".to_string());
     }
 }
