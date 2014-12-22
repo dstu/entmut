@@ -70,10 +70,7 @@ impl<T: Show> Show for Tree<T> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         enum Walk<T> { Down(T), Up, };
         let mut stack = Vec::new();
-        match write!(f, "({}", self.data) {
-            Err(e) => return Err(e),
-            _ => (),
-        }
+        try![write!(f, "({}", self.data)];
         stack.push(Walk::Up);
         for c in self.children.iter().rev() {
             stack.push(Walk::Down(c));
@@ -81,18 +78,13 @@ impl<T: Show> Show for Tree<T> {
         loop {
             match stack.pop() {
                 None => return Ok(()),
-                Some(Walk::Up) => match write!(f, ")") {
-                    Err(e) => return Err(e),
-                    _ => (),
-                },
-                Some(Walk::Down(t)) => match write!(f, " ({}", t.data) {
-                    Err(e) => return Err(e),
-                    _ => {
-                        stack.push(Walk::Up);
-                        for c in t.children.iter().rev() {
-                            stack.push(Walk::Down(c));
-                        }
-                    },
+                Some(Walk::Up) => try![write!(f, ")")],
+                Some(Walk::Down(t)) => {
+                    try![write!(f, " ({}", t.data)];
+                    stack.push(Walk::Up);
+                    for c in t.children.iter().rev() {
+                        stack.push(Walk::Down(c));
+                    }
                 },
             }
         }
