@@ -65,12 +65,10 @@ impl<T> Tree<T> {
     }
 }
 
+
 impl<T: Show> Show for Tree<T> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        enum Walk<T> {
-            Down(T),
-            Up,
-        };
+        enum Walk<T> { Down(T), Up, };
         let mut stack = Vec::new();
         match write!(f, "({}", self.data) {
             Err(e) => return Err(e),
@@ -161,7 +159,7 @@ impl<T> Zipper<T> {
                     let mut new_children = Vec::with_capacity(lefts.len() + rights.len() + 1);
                     new_children.extend(lefts.into_iter());
                     new_children.push(here);
-                    new_children.extend(rights.into_iter());
+                    new_children.extend(rights.into_iter().rev());
                     here = Tree::new(parent_data, new_children);
                     lefts = parent_lefts;
                     rights = parent_rights;
@@ -293,6 +291,14 @@ impl<T> Zipper<T> {
         } else {
             false
         }
+    }
+
+    pub fn push_child_front(&mut self, child: Tree<T>) {
+        self.here.children.insert(0, child);
+    }
+
+    pub fn push_child_back(&mut self, child: Tree<T>) {
+        self.here.children.push(child);
     }
 
     pub fn to_push_child_front(self, child: Tree<T>) -> Zipper<T> {
@@ -487,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn test_trivial_zipping() {
+    fn test_trivial_zipping_1() {
         let mut z = Tree::leaf("head").zipper();
         assert_eq!(z.here.to_string(), "(head)".to_string());
         assert_eq!(z.clone().to_root().here.to_string(), 
@@ -508,7 +514,16 @@ mod tests {
         };
         assert_eq!(z.clone().to_root().here.to_string(),
                    "(head (one) (two))".to_string());
+    }
 
+    #[test]
+    fn test_trivial_zipping_2() {
+        let mut z = Tree::leaf("head").zipper();
+        z = z.to_push_child_front(Tree::leaf("two"));
+        assert_eq!(z.here.to_string(), "(two)".to_string());
+        z = z.to_push_left(Tree::leaf("one"));
+        assert_eq!(z.here.to_string(), "(one)".to_string());
+        z = z.to_right().unwrap();
         z.push_right(Tree::leaf("three"));
         assert_eq!(z.here.to_string(), "(two)".to_string());
         assert_eq!(z.clone().to_root().here.to_string(),
