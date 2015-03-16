@@ -1,21 +1,44 @@
+#![feature(core)]
+
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::fmt::{Debug, Error, Formatter};
 use std::num::{Int, SignedInt};
+use std::rc::Rc;
+
+// Basic use cases:
+//  - Fixed tree (built once). Handled by ?building, Tree, Navigator.
+//  - Fixed-topology tree (data mutates). Handled by ?building, Tree,
+//    Navigator with RefCell<T> for data.
+//  - Shared-data tree (topology fixed). Handled by ?building, Tree,
+//    Navigator with RefCell<T> for data.
+//  - Shared-topology tree (data fixed).
+//  - Shared-both tree.
 
 pub struct Tree<T> {
     data: T,
     children: Vec<Tree<T>>,
 }
 
-struct TraversalCell<'a, T: 'a> {
+// Like a stack frame when recursively descending a tree.
+struct NavigatorCell<'a, T: 'a> {
     tree: &'a Tree<T>,
     index: usize,
 }
 
 pub struct Navigator<'a, T: 'a> {
     here: &'a Tree<T>,
-    path: Vec<TraversalCell<'a, T>>,
+    path: Vec<NavigatorCell<'a, T>>,
+}
+
+struct ZipperCell<'a, T: 'a> {
+    tree: Rc<RefCell<&'a mut Tree<T>>>,
+    index: usize,
+}
+
+pub struct Zipper<'a, T: 'a> {
+    here: ZipperCell<'a, T>,
+    path: Vec<ZipperCell<'a, T>>,
 }
 
 impl<T> Tree<T> {
@@ -41,6 +64,26 @@ impl<T> Tree<T> {
     pub fn children_mut<'s>(&'s mut self) -> &'s mut [Tree<T>] {
         self.children.as_mut_slice()
     }
+
+    pub fn remove_child(&mut self, index: usize) {
+        self.children.remove(index);
+    }
+
+    pub fn insert_child(&mut self, index: usize, child: Tree<T>) {
+        self.children.insert(index, child);
+    }
+
+    pub fn pop_child(&mut self) -> Option<Tree<T>> {
+        self.children.pop()
+    }
+
+    pub fn push_child(&mut self, child: Tree<T>) {
+        self.children.push(child);
+    }
+
+    pub fn navigator<'s>(&'s self) -> Navigator<'s, T> {
+        Navigator { here: self, path: Vec::new(), }
+    }
 }
 
 #[macro_export]
@@ -52,30 +95,30 @@ macro_rules! tree {
                                        $(,tree![$($rest)*])*] });
 }
 
-// impl<T: Show> Show for Tree<T> {
-//     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-//         enum Walk<T> { Down(T), Up, };
-//         let mut stack = Vec::new();
-//         try![write!(f, "({}", self.data)];
-//         stack.push(Walk::Up);
-//         for c in self.children.iter().rev() {
-//             stack.push(Walk::Down(c));
-//         }
-//         loop {
-//             match stack.pop() {
-//                 None => return Ok(()),
-//                 Some(Walk::Up) => try![write!(f, ")")],
-//                 Some(Walk::Down(t)) => {
-//                     try![write!(f, " ({}", t.data)];
-//                     stack.push(Walk::Up);
-//                     for c in t.children.iter().rev() {
-//                         stack.push(Walk::Down(c));
-//                     }
-//                 },
-//             }
-//         }
-//     }
-// }
+impl<T: Debug> Debug for Tree<T> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        enum Walk<T> { Down(T), Up, };
+        let mut stack = Vec::new();
+        try![write!(f, "({:?}", self.data)];
+        stack.push(Walk::Up);
+        for c in self.children.iter().rev() {
+            stack.push(Walk::Down(c));
+        }
+        loop {
+            match stack.pop() {
+                None => return Ok(()),
+                Some(Walk::Up) => try![write!(f, ")")],
+                Some(Walk::Down(t)) => {
+                    try![write!(f, " ({:?}", t.data)];
+                    stack.push(Walk::Up);
+                    for c in t.children.iter().rev() {
+                        stack.push(Walk::Down(c));
+                    }
+                },
+            }
+        }
+    }
+}
 
 impl<T: Clone> Clone for Tree<T> {
     fn clone(&self) -> Tree<T> {
@@ -176,7 +219,7 @@ impl<'a, T: 'a> Navigator<'a, T> {
         assert![child_index < self.here.children.len(),
                 "child index {} out of range (only {} children)",
                 child_index, self.here.children.len()];
-        self.path.push(TraversalCell { tree: self.here,
+        self.path.push(NavigatorCell { tree: self.here,
                                        index: child_index });
         self.here = &self.here.children[child_index];
     }
@@ -185,5 +228,74 @@ impl<'a, T: 'a> Navigator<'a, T> {
 impl<'a, T: 'a> Borrow<Tree<T>> for Navigator<'a, T> {
     fn borrow(&self) -> &Tree<T> {
         self.here
+    }
+}
+
+// impl<'a, T: 'a> Zipper<'a, T> {
+//     pub fn seek_child(&'a mut self, child_index: usize) {
+//         self.here = {
+//             let here_cell = &self.here;
+//             let here = here_cell.borrow_mut();
+//             assert![child_index < here.children.len(),
+//                     "child index {} out of range (only {} children)",
+//                     child_index, here.children.len()];
+//             self.path.push(ZipperCell { tree: self.here.clone(),
+//                                         index: child_index });
+//             Rc::new(RefCell::new(&mut here.children[child_index]))
+//         };
+//     }
+// }
+
+#[cfg(test)]
+mod test {
+    use ::Tree;
+    
+    #[test]
+    fn test_leaf() {
+        assert![Tree::leaf("hi") == tree!["hi"]];
+        assert![Tree { data: "hi", children: Vec::new(), } == tree!["hi"]];
+        let leaf = tree!["hi"];
+        assert![leaf.data() == &"hi"];
+        assert![leaf.children().len() == 0];
+    }
+
+    #[test]
+    fn test_nested_01() {
+        let reference = Tree { data: "hi",
+                               children: vec![Tree::leaf("a"),
+                                              Tree::leaf("b")] };
+        assert![reference == tree!["hi", ["a"], ["b"]]];
+    }
+
+
+    #[test]
+    fn test_nested_02() {
+        let mut reference = Tree::leaf("hi");
+        reference.push_child(Tree::leaf("a"));
+        reference.push_child(Tree::leaf("b"));
+        assert![reference == tree!["hi", ["a"], ["b"]]];
+    }
+
+    #[test]
+    fn test_nested_03() {
+        let reference = Tree { data: "hi",
+                               children: vec![Tree { data: "a",
+                                                     children: vec![Tree::leaf("b"),
+                                                                    Tree::leaf("c")] },
+                                              Tree { data: "d",
+                                                     children: vec![Tree {
+                                                         data: "e",
+                                                         children: vec![Tree::leaf("f"), Tree::leaf("g")]
+                                                     }],
+                                              }],
+        };
+        assert![reference == tree!["hi", ["a", ["b"], ["c"]], ["d", ["e", ["f"], ["g"]]]]];
+    }
+
+    #[test]
+    fn test_debug_format() {
+        assert![format!("{:?}", tree!["a"]) == "(\"a\")"];
+        assert![format!("{:?}", tree!["hi", ["a", ["b"], ["c"]], ["d", ["e", ["f"], ["g"]]]]) == "(\"hi\" (\"a\" (\"b\") (\"c\")) (\"d\" (\"e\" (\"f\") (\"g\"))))"];
+        assert![format!("{:?}", tree!["a", ["b"], ["c"], ["d"], ["e"]]) == "(\"a\" (\"b\") (\"c\") (\"d\") (\"e\"))"];
     }
 }
