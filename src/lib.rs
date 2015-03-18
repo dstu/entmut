@@ -1,19 +1,17 @@
 #![feature(core)]
 
-use std::borrow::Borrow;
-use std::cell::RefCell;
+use std::borrow::{Borrow, BorrowMut};
 use std::fmt::{Debug, Error, Formatter};
+use std::mem;
 use std::num::{Int, SignedInt};
-use std::rc::Rc;
 
 // Basic use cases:
-//  - Fixed tree (built once). Handled by ?building, Tree, Navigator.
-//  - Fixed-topology tree (data mutates). Handled by ?building, Tree,
-//    Navigator with RefCell<T> for data.
-//  - Shared-data tree (topology fixed). Handled by ?building, Tree,
-//    Navigator with RefCell<T> for data.
+//  - Fixed tree (built once). Handled by Zipper, Tree, Navigator.
+//  - Fixed-topology tree (data mutates). Handled by Zipper, Tree, Navigator.
+//  - Shared-data tree (topology fixed). Handled by ?building, Tree, Navigator
+//    with RefCell<T> or Mutex<T> for data.
 //  - Shared-topology tree (data fixed).
-//  - Shared-both tree.
+//  - Shared-data, shared-topology tree.
 
 pub struct Tree<T> {
     data: T,
@@ -31,14 +29,14 @@ pub struct Navigator<'a, T: 'a> {
     path: Vec<NavigatorCell<'a, T>>,
 }
 
-struct ZipperCell<'a, T: 'a> {
-    tree: Rc<RefCell<&'a mut Tree<T>>>,
+struct ZipperCell<T> {
+    tree: *mut Tree<T>,
     index: usize,
 }
 
 pub struct Zipper<'a, T: 'a> {
-    here: ZipperCell<'a, T>,
-    path: Vec<ZipperCell<'a, T>>,
+    here: &'a mut Tree<T>,
+    path: Vec<ZipperCell<T>>,
 }
 
 impl<T> Tree<T> {
@@ -90,6 +88,14 @@ impl<T> Tree<T> {
 macro_rules! tree {
     ($data:expr) => ($crate::Tree::leaf($data));
     ($data:expr, [$($first:tt)*] $(,[$($rest:tt)*])*) =>
+        ($crate::Tree { data: $data,
+                        children: vec![tree![$($first)*]
+                                       $(,tree![$($rest)*])*] });
+    ($data:expr, ($($first:tt)*) $(,($($rest:tt)*))*) =>
+        ($crate::Tree { data: $data,
+                        children: vec![tree![$($first)*]
+                                       $(,tree![$($rest)*])*] });
+    ($data:expr, {$($first:tt)*} $(,{$($rest:tt)*})*) =>
         ($crate::Tree { data: $data,
                         children: vec![tree![$($first)*]
                                        $(,tree![$($rest)*])*] });
@@ -173,12 +179,17 @@ impl<'a, T: 'a> Navigator<'a, T> {
     }
 
     pub fn to_parent(&mut self) {
+        match self.path.pop() {
+            None => panic!["already at root"],
+            Some(traversal) => self.here = &traversal.tree,
+        }
+    }
+
+    pub fn to_root(&mut self) {
         loop {
             match self.path.pop() {
                 None => return,
-                Some(traversal) => {
-                    self.here = &traversal.tree.children[traversal.index]
-                },
+                Some(traversal) => self.here = &traversal.tree,
             }
         }
     }
@@ -223,6 +234,18 @@ impl<'a, T: 'a> Navigator<'a, T> {
                                        index: child_index });
         self.here = &self.here.children[child_index];
     }
+
+    // pub fn has_left(&self) -> bool {
+    // }
+
+    // pub fn has_right(&self) -> bool {
+    // }
+
+    // pub fn to_left(&mut self) {
+    // }
+
+    // pub fn to_right(&mut self) {
+    // }
 }
 
 impl<'a, T: 'a> Borrow<Tree<T>> for Navigator<'a, T> {
@@ -231,20 +254,113 @@ impl<'a, T: 'a> Borrow<Tree<T>> for Navigator<'a, T> {
     }
 }
 
-// impl<'a, T: 'a> Zipper<'a, T> {
-//     pub fn seek_child(&'a mut self, child_index: usize) {
-//         self.here = {
-//             let here_cell = &self.here;
-//             let here = here_cell.borrow_mut();
-//             assert![child_index < here.children.len(),
-//                     "child index {} out of range (only {} children)",
-//                     child_index, here.children.len()];
-//             self.path.push(ZipperCell { tree: self.here.clone(),
-//                                         index: child_index });
-//             Rc::new(RefCell::new(&mut here.children[child_index]))
-//         };
-//     }
-// }
+impl<'a, T: 'a> Zipper<'a, T> {
+    pub fn is_root(&self) -> bool {
+        self.path.is_empty()
+    }
+
+    pub fn to_root(&mut self) {
+        loop {
+            match self.path.pop() {
+                None => return,
+                Some(traversal) => self.here = unsafe {
+                    mem::transmute(traversal.tree)
+                },
+            }
+        }
+    }
+
+    pub fn to_parent(&mut self) {
+        match self.path.pop() {
+            None => panic!["already at root"],
+            Some(traversal) => self.here = unsafe {
+                mem::transmute(traversal.tree)
+            },
+        }
+    }
+
+    pub fn seek_sibling(&mut self, offset: isize) {
+        assert![!self.is_root()];
+        if offset == 0 {
+            return;
+        }
+        let mut cell = self.path.pop().expect("tree corruption");
+        let offset_abs = offset.abs();
+        let new_index =
+            if offset_abs < 0 {
+                // offset is Int::min_value().
+                cell.index
+                    .checked_sub(1).expect("index underflow")
+                    .checked_sub((offset_abs + 1isize).abs() as usize).expect("index underflow")
+            } else {
+                if offset < 0 {
+                    cell.index.checked_sub(offset_abs as usize).expect("index underflow")
+                } else {
+                    cell.index.checked_add(offset_abs as usize).expect("index overflow")
+                }
+            };
+        {
+            let parent: &mut Tree<T> = unsafe {
+                mem::transmute(cell.tree)
+            };
+            assert![new_index < parent.children.len(),
+                    "sibling index {} out of range (only {} siblings)",
+                    new_index, parent.children.len()];
+            self.here = unsafe {
+                mem::transmute(&mut parent.children[new_index])
+            };
+        }
+        cell.index = new_index;
+        self.path.push(cell);
+    }
+
+    pub fn seek_child(&mut self, child_index: usize) {
+        assert![child_index < self.here.children.len(),
+                "child index {} out of range (only {} children)",
+                child_index, self.here.children.len()];
+        let raw_here = self.here as *mut Tree<T>;
+        self.path.push(ZipperCell { tree: raw_here, index: child_index });
+        self.here = unsafe {
+            mem::transmute(&mut self.here.children[child_index])
+        };
+    }
+
+    // pub fn insert_sibling(&mut self, offset: isize, t: Tree<T>) {
+    // }
+
+    // pub fn insert_child(&mut self, index: usize, t: Tree<T>) {
+    // }
+
+    // pub fn push_child(&mut self, t: Tree<T>) {
+    // }
+
+    // pub fn delete(&mut self) {
+    // }
+
+    // pub fn delete_child(&mut self, index: usize) {
+    // }
+
+    // pub fn delete_sibling(&mut self, offset: isize) {
+    // }
+
+    // pub fn pop_child(&mut self) -> Option<Tree<T>> {
+    // }
+
+    // pub fn swap_sibling(&mut self, offset: isize) {
+    // }
+}
+
+impl<'a, T: 'a> Borrow<Tree<T>> for Zipper<'a, T> {
+    fn borrow(&self) -> &Tree<T> {
+        self.here
+    }
+}
+
+impl<'a, T: 'a> BorrowMut<Tree<T>> for Zipper<'a, T> {
+    fn borrow_mut(&mut self) -> &mut Tree<T> {
+        self.here
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -297,5 +413,23 @@ mod test {
         assert![format!("{:?}", tree!["a"]) == "(\"a\")"];
         assert![format!("{:?}", tree!["hi", ["a", ["b"], ["c"]], ["d", ["e", ["f"], ["g"]]]]) == "(\"hi\" (\"a\" (\"b\") (\"c\")) (\"d\" (\"e\" (\"f\") (\"g\"))))"];
         assert![format!("{:?}", tree!["a", ["b"], ["c"], ["d"], ["e"]]) == "(\"a\" (\"b\") (\"c\") (\"d\") (\"e\"))"];
+    }
+
+    #[test]
+    fn test_recursive_mutating_bfs() {
+        fn mutable_bfs(t: &mut Tree<&str>) {
+            if t.children.len() == 0 {
+                t.data = "leaf";
+            } else {
+                for child in &mut t.children {
+                    mutable_bfs(child);
+                }
+            }
+        }
+
+        let mut t = tree!["a", ["b", ["c"], ["d"], ["e"]], ["f"]];
+        mutable_bfs(&mut t);
+        assert_eq![format!["{:?}", t],
+                   "(\"a\" (\"b\" (\"leaf\") (\"leaf\") (\"leaf\")) (\"leaf\"))"];
     }
 }
