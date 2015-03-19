@@ -4,6 +4,7 @@ use std::borrow::{Borrow, BorrowMut};
 use std::fmt::{Debug, Error, Formatter};
 use std::mem;
 use std::num::{Int, SignedInt};
+use std::ptr;
 
 // Basic use cases:
 //  - Fixed tree (built once). Handled by Zipper, Tree, Navigator.
@@ -37,6 +38,14 @@ struct ZipperCell<T> {
 pub struct Zipper<'a, T: 'a> {
     here: &'a mut Tree<T>,
     path: Vec<ZipperCell<T>>,
+}
+
+enum SiblingOffset {
+    Root,
+    Underflow,
+    Overflow,
+    OutOfRange(usize, usize),
+    Valid(usize),
 }
 
 impl<T> Tree<T> {
@@ -198,32 +207,60 @@ impl<'a, T: 'a> Navigator<'a, T> {
         &self.here
     }
 
-    pub fn seek_sibling(&mut self, offset: isize) {
-        assert![!self.is_root()];
-        if offset == 0 {
-            return;
+    fn validate_sibling_offset(&self, offset: isize) -> SiblingOffset {
+        if self.is_root() {
+            return SiblingOffset::Root;
         }
-        let mut cell = self.path.pop().expect("tree corruption");
         let offset_abs = offset.abs();
+        let parent = &self.path[self.path.len() - 1];
         let new_index =
             if offset_abs < 0 {
                 // offset is Int::min_value().
-                cell.index
-                    .checked_sub(1).expect("index undeflow")
-                    .checked_sub((offset_abs + 1isize).abs() as usize).expect("index underflow")
+                match parent.index.checked_sub(1) {
+                    None => return SiblingOffset::Underflow,
+                    Some(x) => match x.checked_sub((offset_abs + 1isize).abs() as usize) {
+                        None => return SiblingOffset::Underflow,
+                        Some(x) => x,
+                    },
+                }
             } else {
                 if offset < 0 {
-                    cell.index.checked_sub(offset_abs as usize).expect("index underflow")
+                    match parent.index.checked_sub(offset_abs as usize) {
+                        None => return SiblingOffset::Underflow,
+                        Some(x) => x,
+                    }
                 } else {
-                    cell.index.checked_add(offset_abs as usize).expect("index overflow")
+                    match parent.index.checked_add(offset_abs as usize) {
+                        None => return SiblingOffset::Overflow,
+                        Some(x) => x,
+                    }
                 }
             };
-        assert![new_index < cell.tree.children.len(),
-                "sibling index {} out of range (only {} siblings)",
-                new_index, cell.tree.children.len()];
-        self.here = &cell.tree.children[new_index];
-        cell.index = new_index;
-        self.path.push(cell);
+        if new_index >= parent.tree.children.len() {
+            SiblingOffset::OutOfRange(new_index, parent.tree.children.len())
+        } else {
+            SiblingOffset::Valid(new_index)
+        }
+    }
+
+    pub fn seek_sibling(&mut self, offset: isize) {
+        if offset == 0 {
+            return;
+        }
+        match self.validate_sibling_offset(offset) {
+            SiblingOffset::Root => panic!["tree root has no siblings"],
+            SiblingOffset::Underflow => panic!["underflow computing sibling index"],
+            SiblingOffset::Overflow => panic!["overflow computing sibling index"],
+            SiblingOffset::OutOfRange(new_index, siblings) =>
+                panic!["cannot address sibling {} (only {} siblings)",
+                       new_index, siblings],
+            SiblingOffset::Valid(new_index) => {
+                let parent_index = self.path.len() - 1;
+                let parent = &mut self.path[parent_index];
+                parent.index = new_index;
+                self.here = &parent.tree.children[new_index]
+            },
+        }
     }
 
     pub fn seek_child(&mut self, child_index: usize) {
@@ -356,29 +393,156 @@ impl<'a, T: 'a> Zipper<'a, T> {
         };
     }
 
-    // pub fn insert_sibling(&mut self, offset: isize, t: Tree<T>) {
-    // }
+    fn validate_sibling_offset(&self, offset: isize) -> SiblingOffset {
+        if self.is_root() {
+            return SiblingOffset::Root;
+        }
+        let offset_abs = offset.abs();
+        let parent = &self.path[self.path.len() - 1];
+        let new_index =
+            if offset_abs < 0 {
+                // offset is Int::min_value().
+                match parent.index.checked_sub(1) {
+                    None => return SiblingOffset::Underflow,
+                    Some(x) => match x.checked_sub((offset_abs + 1isize).abs() as usize) {
+                        None => return SiblingOffset::Underflow,
+                        Some(x) => x,
+                    },
+                }
+            } else {
+                if offset < 0 {
+                    match parent.index.checked_sub(offset_abs as usize) {
+                        None => return SiblingOffset::Underflow,
+                        Some(x) => x,
+                    }
+                } else {
+                    match parent.index.checked_add(offset_abs as usize) {
+                        None => return SiblingOffset::Overflow,
+                        Some(x) => x,
+                    }
+                }
+            };
+        let parent_tree: &'a mut Tree<T> = unsafe {
+            mem::transmute(parent.tree)
+        };
+        if new_index >= parent_tree.children.len() {
+            SiblingOffset::OutOfRange(new_index, parent_tree.children.len())
+        } else {
+            SiblingOffset::Valid(new_index)
+        }
+    }
 
-    // pub fn insert_child(&mut self, index: usize, t: Tree<T>) {
-    // }
+    pub fn insert_sibling(&mut self, offset: isize, t: Tree<T>) {
+        match self.validate_sibling_offset(offset) {
+            SiblingOffset::Root => panic!["tree root has no siblings"],
+            SiblingOffset::Underflow => panic!["underflow computing sibling index"],
+            SiblingOffset::Overflow => panic!["overflow computing sibling index"],
+            SiblingOffset::OutOfRange(new_index, siblings) =>
+                panic!["sibling index {} out of range (only {} siblings)",
+                       new_index, siblings],
+            SiblingOffset::Valid(new_index) => {
+                let parent_index = self.path.len() - 1;
+                let parent = &mut self.path[parent_index];
+                let parent_tree: &'a mut Tree<T> = unsafe {
+                    mem::transmute(parent.tree)
+                };
+                if new_index <= parent.index {
+                    parent.index += 1;
+                }
+                parent_tree.children.insert(new_index, t);
+            },
+        }
+    }
 
-    // pub fn push_child(&mut self, t: Tree<T>) {
-    // }
+    pub fn insert_child(&mut self, index: usize, t: Tree<T>) {
+        assert![index <= self.here.children.len(),
+                "child index {} is out of bounds (only {} children)",
+                index, self.here.children.len()];
+        self.here.children.insert(index, t);
+    }
 
-    // pub fn delete(&mut self) {
-    // }
+    pub fn push_child(&mut self, t: Tree<T>) {
+        self.here.children.push(t);
+    }
 
-    // pub fn delete_child(&mut self, index: usize) {
-    // }
+    pub fn delete(&mut self) {
+        match self.path.pop() {
+            None => panic!["can't delete root node"],
+            Some(mut parent) => {
+                let parent_tree: &'a mut Tree<T> = unsafe {
+                    mem::transmute(parent.tree)
+                };
+                parent_tree.children.remove(parent.index);
+                if parent_tree.children.is_empty() {
+                    self.here = parent_tree;
+                } else {
+                    while parent.index >= parent_tree.children.len() {
+                        parent.index -= 1;
+                    }
+                    self.here = &mut parent_tree.children[parent.index];
+                }
+            },
+        }
+    }
 
-    // pub fn delete_sibling(&mut self, offset: isize) {
-    // }
+    pub fn delete_child(&mut self, index: usize) {
+        assert![index < self.here.children.len(),
+                "child index {} is out of bounds (only {} children)",
+                index, self.here.children.len()];
+        self.here.children.remove(index);
+    }
 
-    // pub fn pop_child(&mut self) -> Option<Tree<T>> {
-    // }
+    pub fn delete_sibling(&mut self, offset: isize) {
+        if offset == 0isize {
+            self.delete();
+        } else {
+            match self.validate_sibling_offset(offset) {
+                SiblingOffset::Root => panic!["tree root has no siblings"],
+                SiblingOffset::Underflow => panic!["underflow computing sibling index"],
+                SiblingOffset::Overflow => panic!["overflow computing sibling index"],
+                SiblingOffset::OutOfRange(new_index, siblings) =>
+                    panic!["sibling index {} out of range (only {} siblings)",
+                           new_index, siblings],
+                SiblingOffset::Valid(new_index) => {
+                    let parent_index = self.path.len() - 1;
+                    let parent = &mut self.path[parent_index];
+                    let parent_tree: &'a mut Tree<T> = unsafe {
+                        mem::transmute(parent.tree)
+                    };
+                    parent_tree.children.remove(new_index);
+                },
+            }
+        }
+    }
 
-    // pub fn swap_sibling(&mut self, offset: isize) {
-    // }
+    pub fn pop_child(&mut self) -> Option<Tree<T>> {
+        self.here.children.pop()
+    }
+
+    pub fn swap_sibling(&mut self, offset: isize) {
+        if offset == 0isize {
+            return;
+        }
+        match self.validate_sibling_offset(offset) {
+            SiblingOffset::Root => panic!["tree root has no siblings"],
+            SiblingOffset::Underflow => panic!["underflow computing sibling index"],
+            SiblingOffset::Overflow => panic!["overflow computing sibling index"],
+            SiblingOffset::OutOfRange(new_index, siblings) =>
+                panic!["sibling index {} out of range (only {} siblings)",
+                       new_index, siblings],
+            SiblingOffset::Valid(new_index) => {
+                let parent_index = self.path.len() - 1;
+                let parent = &mut self.path[parent_index];
+                let parent_tree: &'a mut Tree<T> = unsafe {
+                    mem::transmute(parent.tree)
+                };
+                unsafe {
+                    ptr::swap(&mut parent_tree.children[new_index] as *mut Tree<T>,
+                              &mut parent_tree.children[parent.index] as *mut Tree<T>);
+                };
+            },
+        }
+    }
 }
 
 impl<'a, T: 'a> Borrow<Tree<T>> for Zipper<'a, T> {
