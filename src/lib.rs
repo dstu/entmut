@@ -8,7 +8,7 @@ use std::num::{Int, SignedInt};
 // Basic use cases:
 //  - Fixed tree (built once). Handled by Zipper, Tree, Navigator.
 //  - Fixed-topology tree (data mutates). Handled by Zipper, Tree, Navigator.
-//  - Shared-data tree (topology fixed). Handled by ?building, Tree, Navigator
+//  - Shared-data tree (topology fixed). Handled by Zipper, Tree, Navigator
 //    with RefCell<T> or Mutex<T> for data.
 //  - Shared-topology tree (data fixed).
 //  - Shared-data, shared-topology tree.
