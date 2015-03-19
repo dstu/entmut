@@ -235,17 +235,48 @@ impl<'a, T: 'a> Navigator<'a, T> {
         self.here = &self.here.children[child_index];
     }
 
-    // pub fn has_left(&self) -> bool {
-    // }
+    pub fn has_left(&self) -> bool {
+        if self.is_root() {
+            return false;
+        }
+        self.path[self.path.len() - 1].index > 0
+    }
 
-    // pub fn has_right(&self) -> bool {
-    // }
+    pub fn has_right(&self) -> bool {
+        if self.is_root() {
+            return false;
+        }
+        let parent = &self.path[self.path.len() - 1];
+        parent.index + 1 < parent.tree.children.len()
+    }
 
-    // pub fn to_left(&mut self) {
-    // }
+    pub fn to_left(&mut self) {
+        match self.path.pop() {
+            None => panic!["root node has no siblings"],
+            Some(mut parent) => {
+                if parent.index == 0 {
+                    panic!["already at leftmost sibling"];
+                }
+                parent.index -= 1;
+                self.here = &parent.tree.children[parent.index];
+                self.path.push(parent);
+            },
+        }
+    }
 
-    // pub fn to_right(&mut self) {
-    // }
+    pub fn to_right(&mut self) {
+        match self.path.pop() {
+            None => panic!["root node has no siblings"],
+            Some(mut parent) => {
+                parent.index += 1;
+                if parent.index >= parent.tree.children.len() {
+                    panic!["already at rightmost sibling"];
+                }
+                self.here = &parent.tree.children[parent.index];
+                self.path.push(parent);
+            },
+        }
+    }
 }
 
 impl<'a, T: 'a> Borrow<Tree<T>> for Navigator<'a, T> {
