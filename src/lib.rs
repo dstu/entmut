@@ -322,6 +322,20 @@ impl<'a, T: 'a> Borrow<Tree<T>> for Navigator<'a, T> {
     }
 }
 
+impl<T> ZipperCell<T> {
+    fn tree<'a>(&self) -> &'a Tree<T> {
+        unsafe {
+            mem::transmute(self.tree)
+        }
+    }
+
+    fn tree_mut<'a>(&mut self) -> &'a mut Tree<T> {
+        unsafe {
+            mem::transmute(self.tree)
+        }
+    }
+}
+
 impl<'a, T: 'a> Zipper<'a, T> {
     pub fn is_root(&self) -> bool {
         self.path.is_empty()
@@ -422,11 +436,8 @@ impl<'a, T: 'a> Zipper<'a, T> {
                     }
                 }
             };
-        let parent_tree: &'a mut Tree<T> = unsafe {
-            mem::transmute(parent.tree)
-        };
-        if new_index >= parent_tree.children.len() {
-            SiblingOffset::OutOfRange(new_index, parent_tree.children.len())
+        if new_index >= parent.tree().children.len() {
+            SiblingOffset::OutOfRange(new_index, parent.tree().children.len())
         } else {
             SiblingOffset::Valid(new_index)
         }
@@ -443,13 +454,10 @@ impl<'a, T: 'a> Zipper<'a, T> {
             SiblingOffset::Valid(new_index) => {
                 let parent_index = self.path.len() - 1;
                 let parent = &mut self.path[parent_index];
-                let parent_tree: &'a mut Tree<T> = unsafe {
-                    mem::transmute(parent.tree)
-                };
                 if new_index <= parent.index {
                     parent.index += 1;
                 }
-                parent_tree.children.insert(new_index, t);
+                parent.tree_mut().children.insert(new_index, t);
             },
         }
     }
@@ -469,17 +477,15 @@ impl<'a, T: 'a> Zipper<'a, T> {
         match self.path.pop() {
             None => panic!["can't delete root node"],
             Some(mut parent) => {
-                let parent_tree: &'a mut Tree<T> = unsafe {
-                    mem::transmute(parent.tree)
-                };
-                parent_tree.children.remove(parent.index);
-                if parent_tree.children.is_empty() {
-                    self.here = parent_tree;
+                let t = parent.tree_mut();
+                t.children.remove(parent.index);
+                if t.children.is_empty() {
+                    self.here = t;
                 } else {
-                    while parent.index >= parent_tree.children.len() {
+                    while parent.index >= t.children.len() {
                         parent.index -= 1;
                     }
-                    self.here = &mut parent_tree.children[parent.index];
+                    self.here = &mut t.children[parent.index];
                 }
             },
         }
@@ -506,10 +512,7 @@ impl<'a, T: 'a> Zipper<'a, T> {
                 SiblingOffset::Valid(new_index) => {
                     let parent_index = self.path.len() - 1;
                     let parent = &mut self.path[parent_index];
-                    let parent_tree: &'a mut Tree<T> = unsafe {
-                        mem::transmute(parent.tree)
-                    };
-                    parent_tree.children.remove(new_index);
+                    parent.tree_mut().children.remove(new_index);
                 },
             }
         }
@@ -533,12 +536,10 @@ impl<'a, T: 'a> Zipper<'a, T> {
             SiblingOffset::Valid(new_index) => {
                 let parent_index = self.path.len() - 1;
                 let parent = &mut self.path[parent_index];
-                let parent_tree: &'a mut Tree<T> = unsafe {
-                    mem::transmute(parent.tree)
-                };
+                let t = parent.tree_mut();
                 unsafe {
-                    ptr::swap(&mut parent_tree.children[new_index] as *mut Tree<T>,
-                              &mut parent_tree.children[parent.index] as *mut Tree<T>);
+                    ptr::swap(&mut t.children[new_index] as *mut Tree<T>,
+                              &mut t.children[parent.index] as *mut Tree<T>);
                 };
             },
         }
