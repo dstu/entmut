@@ -91,6 +91,10 @@ impl<T> Tree<T> {
     pub fn navigator<'s>(&'s self) -> Navigator<'s, T> {
         Navigator { here: self, path: Vec::new(), }
     }
+
+    pub fn zipper<'s>(&'s mut self) -> Zipper<'s, T> {
+        Zipper { here: self, path: Vec::new(), }
+    }
 }
 
 #[macro_export]
