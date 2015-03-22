@@ -341,6 +341,14 @@ impl<'a, T: 'a> Zipper<'a, T> {
         self.path.is_empty()
     }
 
+    pub fn tree<'s>(&'s self) -> &'s Tree<T> {
+        self.here
+    }
+
+    pub fn tree_mut<'s>(&'s mut self) -> &'s mut Tree<T> {
+        self.here
+    }
+
     pub fn to_root(&mut self) {
         loop {
             match self.path.pop() {
