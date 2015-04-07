@@ -1,4 +1,8 @@
+#![feature(alloc)]
+#![feature(convert)]
 #![feature(core)]
+
+pub mod indirect;
 
 use std::borrow::{Borrow, BorrowMut};
 use std::fmt::{Debug, Error, Formatter};
@@ -65,7 +69,7 @@ impl<T> Tree<T> {
     }
 
     pub fn children<'s>(&'s self) -> &'s [Tree<T>] {
-        self.children.as_slice()
+        self.children.as_ref()
     }
 
     pub fn children_mut<'s>(&'s mut self) -> &'s mut [Tree<T>] {
