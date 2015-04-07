@@ -2,6 +2,14 @@
 #![feature(convert)]
 #![feature(core)]
 
+// Basic use cases:
+//  - Fixed tree (built once). Handled by Zipper, Tree, Navigator.
+//  - Fixed-topology tree (data mutates). Handled by Zipper, Tree, Navigator.
+//  - Shared-data tree (topology fixed). Handled by Zipper, Tree, Navigator
+//    with RefCell<T> or Mutex<T> for data.
+//  - Shared-topology tree (data fixed).
+//  - Shared-data, shared-topology tree.
+
 pub mod fixed;
 pub mod indirect;
 
@@ -10,14 +18,6 @@ use std::fmt::{Debug, Error, Formatter};
 use std::mem;
 use std::num::{Int, SignedInt};
 use std::ptr;
-
-// Basic use cases:
-//  - Fixed tree (built once). Handled by Zipper, Tree, Navigator.
-//  - Fixed-topology tree (data mutates). Handled by Zipper, Tree, Navigator.
-//  - Shared-data tree (topology fixed). Handled by Zipper, Tree, Navigator
-//    with RefCell<T> or Mutex<T> for data.
-//  - Shared-topology tree (data fixed).
-//  - Shared-data, shared-topology tree.
 
 pub struct Tree<T> {
     data: T,
