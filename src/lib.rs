@@ -2,6 +2,7 @@
 #![feature(convert)]
 #![feature(core)]
 
+pub mod fixed;
 pub mod indirect;
 
 use std::borrow::{Borrow, BorrowMut};
