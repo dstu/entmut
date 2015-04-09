@@ -1,36 +1,76 @@
-use std::ops::Index;
+use ::{Guard, Nav};
 
-struct TreeInternal<T> {
-    data: Vec<T>,
-    child_lengths: Vec<usize>,
-    children: Vec<usize>,
+use std::borrow::Borrow;
+use std::ops::Deref;
+
+pub struct Tree<T> {
+    data: Vec<T>, offsets: Vec<usize>, children: Vec<usize>,
 }
 
-pub struct Tree<'a, T: 'a> {
-    tree: &'a TreeInternal<T>,
-    here: usize,
-}
-
-pub struct Children<'a, T: 'a> {
-    tree: &'a TreeInternal<T>,
-    here: usize,
-}
-
-impl<'a, T> Tree<'a, T> {
-    pub fn data<'s>(&'s self) -> &'s T {
-        &self.tree.data[self.here]
+impl<T> Tree<T> {
+    pub fn nodes(&self) -> usize {
+        self.data.len()
     }
 
-    pub fn children<'s>(&'s self) -> Children<'s, T> {
-        Children { tree: self.tree, here: self.here, }
+    fn child_count(&self, index: usize) -> usize {
+        // TODO make arithmetic safe.
+        if index + 1 < self.nodes() {
+            self.offsets[index + 1] - self.offsets[index]
+        } else if index + 1 == self.nodes() {
+            self.nodes() - self.offsets[index]
+        } else {
+            panic!["No such child {} (only {} nodes in tree)",
+                   index, self.nodes()]
+        }
     }
 }
 
-impl<'a, T> Index<usize> for Tree<'a, T> {
-    type Output = Tree<'a, T>;
+pub struct DataGuard<'a, T: 'a> {
+    tree: &'a Tree<T>, index: usize,
+}
 
-    fn index<'s>(&'s self, index: usize) -> &'s Tree<'a, T> {
-        assert![index < self.tree.child_lengths[self.here]];
-        Tree { tree: self.tree, here: self.tree.children[self.here + index] }
+impl<'a, T: 'a> Guard<'a, T> for DataGuard<'a, T> {
+    fn super_deref<'s>(&'s self) -> &'a T {
+        &self.tree.data[self.index]
+    }
+}
+
+pub struct Navigator<'a, T: 'a> {
+    tree: &'a Tree<T>, path: Vec<usize>,
+}
+
+impl<'a, T: 'a> Navigator<'a, T> {
+    fn index(&self) -> usize {
+        self.path[self.path.len() - 1]
+    }
+}
+
+impl<'a, T: 'a> Nav<'a> for Navigator<'a, T> {
+    type Data = T;
+    type DataGuard = DataGuard<'a, T>;
+
+    fn seek_sibling(&mut self, offset: isize) {
+        // TODO
+    }
+
+    fn seek_child(&mut self, index: usize) {
+        // TODO
+    }
+
+    fn child_count(&self) -> usize {
+        self.tree.child_count(self.index())
+    }
+
+    fn is_root(&self) -> bool {
+        self.path.len() == 1
+    }
+
+    fn to_parent(&mut self) {
+        assert![self.path.len() <= 1, "Already at root"];
+        self.path.pop();
+    }
+
+    fn data(&self) -> DataGuard<'a, T> {
+        DataGuard { tree: self.tree, index: self.index(), }
     }
 }
