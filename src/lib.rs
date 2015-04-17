@@ -1,6 +1,3 @@
-#![feature(convert)]
-#![feature(core)]
-
 // Basic use cases:
 //  - Fixed tree (built once). Handled by Zipper, Tree, Navigator.
 //  - Fixed-topology tree (data mutates). Handled by Zipper, Tree, Navigator.
@@ -10,13 +7,13 @@
 //  - Shared-data, shared-topology tree.
 
 pub mod fixed;
+// pub mod linked;
 pub mod owned;
-pub mod shared;
+// pub mod shared;
 
-use std::borrow::Borrow;
-use std::fmt::{Debug, Error, Formatter};
+mod util;
+
 use std::mem;
-use std::num::{Int, SignedInt};
 use std::ops::Deref;
 
 pub trait Guard<'a, T: 'a> {
@@ -35,11 +32,20 @@ impl<'a, T: 'a> Deref for Guard<'a, T> {
 pub trait Nav<'a> {
     type Data;
     type DataGuard: Guard<'a, <Self as Nav<'a>>::Data>;
+
+    fn child_count(&self) -> usize;
+    fn at_leaf(&self) -> bool {
+        self.child_count() == 0
+    }
+    fn at_root(&self) -> bool;
     fn seek_sibling(&mut self, offset: isize);
     fn seek_child(&mut self, index: usize);
-    fn child_count(&self) -> usize;
-    fn is_root(&self) -> bool;
     fn to_parent(&mut self);
+    fn to_root(&mut self) {
+        while ! self.at_root() {
+            self.to_parent();
+        }
+    }
     fn data(&self) -> <Self as Nav<'a>>::DataGuard;
 }
 
@@ -141,11 +147,11 @@ pub trait Nav<'a> {
 //                                        $(,tree![$($rest)*])*] });
 // }
 
-// impl<T: Debug> Debug for Tree<T> {
+// impl<'a, T: Debug + 'a, G: Guard<'a, T>> Debug for Nav<'a, Data=T, DataGuard=G> {
 //     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
 //         enum Walk<T> { Down(T), Up, };
 //         let mut stack = Vec::new();
-//         try![write!(f, "({:?}", self.data)];
+//         try![write!(f, "({:?}", self.data().deref())];
 //         stack.push(Walk::Up);
 //         for c in self.children.iter().rev() {
 //             stack.push(Walk::Down(c));
@@ -155,7 +161,7 @@ pub trait Nav<'a> {
 //                 None => return Ok(()),
 //                 Some(Walk::Up) => try![write!(f, ")")],
 //                 Some(Walk::Down(t)) => {
-//                     try![write!(f, " ({:?}", t.data)];
+//                     try![write!(f, " ({:?}", *t.data().deref())];
 //                     stack.push(Walk::Up);
 //                     for c in t.children.iter().rev() {
 //                         stack.push(Walk::Down(c));
