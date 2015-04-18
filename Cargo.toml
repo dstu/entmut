@@ -1,4 +1,4 @@
 [package]
-name = "tree"
+name = "entmut"
 version = "0.0.1"
 authors = [ "Stu Black <trurl@freeshell.org>" ]
