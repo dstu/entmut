@@ -15,6 +15,7 @@ pub mod shared;
 
 mod util;
 
+use std::clone::Clone;
 use std::mem;
 use std::ops::Deref;
 
@@ -38,15 +39,14 @@ impl<'a, T: 'a> Deref for Guard<'a, T> {
     }
 }
 
-/// Read-only navigable view of a tree.
+/// Navigable fixed-topology view of a tree.
 ///
-/// This trait defines a read-only view of a tree that is analogous to a
-/// sequential iterator providing read-only pointers into a structure. At any
-/// given point in time, it can be thought of as pointing to a particular tree
-/// node. Methods are provided for walking the tree and updating which node is
-/// pointed at. A guarded reference to the data at a node can be obtained at any
-/// time, with the lifetime of the reference good for the lifetime of the view
-/// of the tree.
+/// This trait defines a view of a tree that is analogous to a sequential
+/// iterator providing read-only pointers into a structure. At any given point
+/// in time, it can be thought of as pointing to a particular tree node. Methods
+/// are provided for walking the tree and updating which node is pointed at. A
+/// guarded reference to the data at a node can be obtained at any time, with
+/// the lifetime of the reference good for the lifetime of the view of the tree.
 ///
 /// If you have worked with
 /// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
@@ -54,13 +54,16 @@ impl<'a, T: 'a> Deref for Guard<'a, T> {
 ///
 /// The read-only nature of this view does not guarantee immutability or thread
 /// safety. An internally mutable type for `Data` (like `std::cell::RefCell<T>`)
-/// will permit updates to tree data through this view. For thread-safe access
-/// to tree data, consider using `std::sync::Mutex<T>`. The tree topology,
+/// will permit updates to tree data through this view. The tree topology,
 /// however, should stay fixed.
 ///
 /// Implementations of this trait should have their lifetime parameter
 /// constrained by a read-only borrow of a tree structure. It should be safe to
 /// create multiple views of the same structure.
+///
+/// To make it convenient to navigate through a tree and retain pointers along
+/// the way, it is recommended that implementors also provide an implementation
+/// of `std::clone::Clone`.
 pub trait Nav<'a> {
     /// Type of data structures held at tree nodes.
     ///
@@ -85,9 +88,8 @@ pub trait Nav<'a> {
 
     /// Navigates to the sibling at `offset`, for which negative values indicate
     /// navigating to the left of this node's location and positive value to the
-    /// right. An offset of 0 is a no-op. Panics if this is the tree root, there
-    /// are no siblings to navigate to, or `offset` resolves to a nonexistant
-    /// sibling.
+    /// right. An offset of 0 is a no-op. Panics if this is the tree root or
+    /// `offset` resolves to a nonexistant sibling.
     fn seek_sibling(&mut self, offset: isize);
 
     /// Navigates to the child at at the given index. Panics if there are no
@@ -100,9 +102,8 @@ pub trait Nav<'a> {
     /// Navigates to the tree's root. If this navigator is already pointing at
     /// the tree root, this is a no-op.
     ///
-    /// A note for implementors: the default implementation of this method
-    /// repeatedly calls `to_parent`. You may wish to provide a more efficient
-    /// implementation.
+    /// The default implementation of this method repeatedly calls
+    /// `to_parent`. Implementors may wish to provide a more efficient method.
     fn to_root(&mut self) {
         while ! self.at_root() {
             self.to_parent();

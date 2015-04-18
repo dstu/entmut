@@ -1,8 +1,15 @@
 use ::{Guard, Nav};
 use ::util::{ChildIndex, SiblingIndex};
 
+use std::clone::Clone;
 use std::iter::Iterator;
 
+/// Single-ownership trees wherein a parent owns its children.
+///
+/// This tree structure keeps its children in a heap-allocated array, so
+/// appending children is a cheap operation. References into the tree cannot be
+/// retained when modifying it, however, and subtrees cannot be shared between
+/// parents.
 pub struct Tree<T> {
     data: T, children: Vec<Tree<T>>,
 }
@@ -41,6 +48,12 @@ pub struct Navigator<'a, T: 'a> {
 impl<'a, T: 'a> Navigator<'a, T> {
     fn new(tree: &'a Tree<T>) -> Self {
         Navigator { here: tree, path: Vec::new(), }
+    }
+}
+
+impl<'a, T: 'a> Clone for Navigator<'a, T> {
+    fn clone(&self) -> Self {
+        Navigator { here: self.here, path: self.path.clone(), }
     }
 }
 

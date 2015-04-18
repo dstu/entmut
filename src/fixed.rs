@@ -1,8 +1,19 @@
 use ::{Guard, Nav};
 use ::util::{ChildIndex, SiblingIndex};
 
+use std::clone::Clone;
 // use std::iter::Iterator;
 
+/// Fixed-layout tree with good memory locality guarantees.
+///
+/// This tree structure does not provide methods for arbitrarily modifying its
+/// topology, but it does provide good memory locality guarantees. Internally,
+/// tree data is kept in a single heap-allocated region. Records of tree edges
+/// are also kept in contiguous regions of memory, so tree navigation should be
+/// fast.
+///
+/// If the tree is extended with additional children, it may reallocate its
+/// entire structure.
 pub struct Tree<T> {
     data: Vec<T>, offsets: Vec<usize>, children: Vec<usize>,
 }
@@ -89,6 +100,12 @@ pub struct Navigator<'a, T: 'a> {
 impl<'a, T: 'a> Navigator<'a, T> {
     fn index(&self) -> usize {
         self.path[self.path.len() - 1]
+    }
+}
+
+impl<'a, T: 'a> Clone for Navigator<'a, T> {
+    fn clone(&self) -> Self {
+        Navigator { tree: self.tree, path: self.path.clone(), }
     }
 }
 
