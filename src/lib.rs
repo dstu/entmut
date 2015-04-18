@@ -1,15 +1,15 @@
 // Basic use cases:
-//  - Fixed tree (built once). Handled by Zipper, Tree, Navigator.
-//  - Fixed-topology tree (data mutates). Handled by Zipper, Tree, Navigator.
-//  - Shared-data tree (topology fixed). Handled by Zipper, Tree, Navigator
-//    with RefCell<T> or Mutex<T> for data.
+//  - Fixed tree (built once). Handled by Zipper, Tree, Nav.
+//  - Fixed-topology tree (data mutates). Handled by Zipper, Tree, Nav.
+//  - Shared-data tree (topology fixed). Handled by Zipper, Tree, Nav with
+//    RefCell<T> or Mutex<T> for data.
 //  - Shared-topology tree (data fixed).
 //  - Shared-data, shared-topology tree.
 
 pub mod fixed;
 // pub mod linked;
 pub mod owned;
-// pub mod shared;
+pub mod shared;
 
 mod util;
 
