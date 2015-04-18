@@ -1,3 +1,5 @@
+//! Tree structure implementations and common traits for manipulating them.
+
 // Basic use cases:
 //  - Fixed tree (built once). Handled by Zipper, Tree, Nav.
 //  - Fixed-topology tree (data mutates). Handled by Zipper, Tree, Nav.
@@ -16,6 +18,13 @@ mod util;
 use std::mem;
 use std::ops::Deref;
 
+/// Accessor trait that provides a fixed-lifetime read-only reference to
+/// data.
+///
+/// This is used by read-only views of a tree structure, with the lifetime of
+/// the guard pinned to the lifetime of the view. If a tree implementation
+/// allows internal mutability (via the use of `RefCell` or otherwise), then
+/// this does not guarantee that the data will not change.
 pub trait Guard<'a, T: 'a> {
     fn super_deref<'s>(&'s self) -> &'a T;
 }
@@ -29,23 +38,79 @@ impl<'a, T: 'a> Deref for Guard<'a, T> {
     }
 }
 
+/// Read-only navigable view of a tree.
+///
+/// This trait defines a read-only view of a tree that is analogous to a
+/// sequential iterator providing read-only pointers into a structure. At any
+/// given point in time, it can be thought of as pointing to a particular tree
+/// node. Methods are provided for walking the tree and updating which node is
+/// pointed at. A guarded reference to the data at a node can be obtained at any
+/// time, with the lifetime of the reference good for the lifetime of the view
+/// of the tree.
+///
+/// If you have worked with
+/// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
+/// seem familiar.
+///
+/// The read-only nature of this view does not guarantee immutability or thread
+/// safety. An internally mutable type for `Data` (like `std::cell::RefCell<T>`)
+/// will permit updates to tree data through this view. For thread-safe access
+/// to tree data, consider using `std::sync::Mutex<T>`. The tree topology,
+/// however, should stay fixed.
+///
+/// Implementations of this trait should have their lifetime parameter
+/// constrained by a read-only borrow of a tree structure. It should be safe to
+/// create multiple views of the same structure.
 pub trait Nav<'a> {
+    /// Type of data structures held at tree nodes.
+    ///
+    /// E.g., the `T` of some `Tree<T>`.
     type Data;
+
+    /// Concrete guard implementation.
     type DataGuard: Guard<'a, <Self as Nav<'a>>::Data>;
 
+    /// Returns the number of children of the current node.
     fn child_count(&self) -> usize;
+
+    /// Returns `true` iff the current node is a leaf (i.e., it has no
+    /// children).
     fn at_leaf(&self) -> bool {
         self.child_count() == 0
     }
+
+    /// Returns `true` iff the current node is the tree root (i.e., it has no
+    /// parent).
     fn at_root(&self) -> bool;
+
+    /// Navigates to the sibling at `offset`, for which negative values indicate
+    /// navigating to the left of this node's location and positive value to the
+    /// right. An offset of 0 is a no-op. Panics if this is the tree root, there
+    /// are no siblings to navigate to, or `offset` resolves to a nonexistant
+    /// sibling.
     fn seek_sibling(&mut self, offset: isize);
+
+    /// Navigates to the child at at the given index. Panics if there are no
+    /// children to navigate to or `index` resolves to a nonexistant child.
     fn seek_child(&mut self, index: usize);
+
+    /// Navigates to this node's parent. Panics if this is the root.
     fn to_parent(&mut self);
+
+    /// Navigates to the tree's root. If this navigator is already pointing at
+    /// the tree root, this is a no-op.
+    ///
+    /// A note for implementors: the default implementation of this method
+    /// repeatedly calls `to_parent`. You may wish to provide a more efficient
+    /// implementation.
     fn to_root(&mut self) {
         while ! self.at_root() {
             self.to_parent();
         }
     }
+
+    /// Returns this node's data. The guard that is returned should be viable
+    /// for the lifetime of this view.
     fn data(&self) -> <Self as Nav<'a>>::DataGuard;
 }
 
