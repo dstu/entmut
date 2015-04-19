@@ -15,11 +15,19 @@ pub struct Tree<T> {
 }
 
 impl<T> Tree<T> {
+    pub fn new(data: T, children: Vec<Tree<T>>) -> Self {
+        Tree { data: data, children: children, }
+    }
+
+    pub fn leaf(data: T) -> Self {
+        Tree { data: data, children: Vec::new(), }
+    }
+
     // TODO: loop instead of recurring to avoid blowing the stack.
-    pub fn new<I: Iterator<Item=(T, I)>>(data: T, children: I) -> Self {
+    pub fn from_traversal<I: Iterator<Item=(T, I)>>(data: T, children: I) -> Self {
         let mut t = Tree { data: data, children: vec![], };
         for (child_data, child_children) in children {
-            t.children.push(Tree::new(child_data, child_children));
+            t.children.push(Tree::from_traversal(child_data, child_children));
         }
         t.children.shrink_to_fit();
         return t;

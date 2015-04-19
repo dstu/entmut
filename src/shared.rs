@@ -23,6 +23,34 @@ pub struct Tree<T> {
     internal: Rc<TreeInternal<T>>,
 }
 
+impl<T> Tree<T> {
+    pub fn new(data: T, children: Vec<Tree<T>>) -> Self {
+        Tree { internal: Rc::new(TreeInternal { data: data, children: RefCell::new(children), }), }
+    }
+
+    pub fn leaf(data: T) -> Self {
+        Tree { internal: Rc::new(TreeInternal { data: data, children: RefCell::new(Vec::new()), }), }
+    }
+
+    pub fn push_child(&mut self, child: Tree<T>) {
+        self.internal.children.borrow_mut().push(child);
+    }
+
+    pub fn remove_child(&mut self, index: usize) {
+        assert![index < self.internal.children.borrow().len(),
+                "cannot remove child at index {} (only {} children)", index, self.internal.children.borrow().len()];
+        self.internal.children.borrow_mut().remove(index);
+    }
+
+    pub fn insert_child(&mut self, index: usize, child: Tree<T>) {
+        self.internal.children.borrow_mut().insert(index, child);
+    }
+
+    pub fn nav<'s>(&'s self) -> Navigator<'s, T> {
+        Navigator::new(self)
+    }
+}
+
 /// Creates a new reference to this tree, such that modifyig the reference also
 /// modifies the original tree.
 impl<T> Clone for Tree<T> {
@@ -49,6 +77,10 @@ pub struct Navigator<'a, T: 'a> {
 }
 
 impl<'a, T: 'a> Navigator<'a, T> {
+    fn new(root: &'a Tree<T>) -> Self {
+        Navigator { root: root, path: Vec::new(), }
+    }
+
     fn here<'s>(&'s self) -> &'s Tree<T> {
         match self.path.last() {
             None => self.root,
