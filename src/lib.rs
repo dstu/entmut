@@ -15,7 +15,6 @@ pub mod shared;
 
 mod util;
 
-use std::clone::Clone;
 use std::mem;
 use std::ops::Deref;
 
