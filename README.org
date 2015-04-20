@@ -1,13 +1,18 @@
-* Entmut: for when your data structures are feeling treeish
+* Overview
+
+/Entmut: for when your data structures are feeling treeish./
 
 This package provides several implementations of a [[http://en.wikipedia.org/wiki/Tree_(data_structure)][tree data structure]] and
 iterator-like traits for working with them.
 
+This is a work in progress. Several abstractions are still being
+planned/explored/experimented with.
+
 ** Traits
 
-| Trait         | Description                     | Tree data                        | Tree structure |
-|---------------+---------------------------------+----------------------------------+----------------|
-| =entmut::Nav= | Fixed-topology tree navigation. | Read-only or internally mutable. | Read-only.     |
+| Trait             | Description                     | Tree data                        | Tree structure |
+|-------------------+---------------------------------+----------------------------------+----------------|
+| =entmut::Nav=     | Fixed-topology tree navigation. | Read-only or internally mutable. | Read-only.     |
 
 ** Implementations
 
