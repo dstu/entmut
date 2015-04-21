@@ -22,7 +22,7 @@ pub struct Tree<T> {
 impl<T> Tree<T> {
     /// Constructs a tree based on the ordering imposed by a traversal.
     ///
-    /// In the resulting tree, nodes will be laid out in memory in the same
+    /// In the resulting tree, node data will be laid out in memory in the same
     /// order in which they are visited by the traversal imposed by `queue`.
     pub fn from_traversal<Q, I>(mut queue: Q, data: T, children: I) -> Self
         where Q: Queue<(usize, usize, T, I)>, I: Iterator<Item=(T, I)> {
