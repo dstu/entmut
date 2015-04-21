@@ -6,8 +6,6 @@ use std::clone::Clone;
 use std::mem;
 use std::rc::Rc;
 
-/// Heap-allocated, reference-counted trees that can be shared freely.
-
 struct TreeInternal<T> {
     data: T, children: RefCell<Vec<Tree<T>>>,
 }
