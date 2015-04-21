@@ -51,7 +51,7 @@ impl<T> Tree<T> {
     }
 }
 
-/// Creates a new reference to this tree, such that modifyig the reference also
+/// Creates a new reference to this tree, such that modifying the reference also
 /// modifies the original tree.
 impl<T> Clone for Tree<T> {
     fn clone(&self) -> Self {
