@@ -23,6 +23,20 @@ impl<T> Tree<T> {
         Tree { data: data, children: Vec::new(), }
     }
 
+    pub fn push_child(&mut self, child: Tree<T>) {
+        self.children.push(child);
+    }
+
+    pub fn remove_child(&mut self, index: usize) {
+        assert![index < self.children.len(),
+                "cannot remove child at index {} (only {} children)", index, self.children.len()];
+        self.children.remove(index);
+    }
+
+    pub fn insert_child(&mut self, index: usize, child: Tree<T>) {
+        self.children.insert(index, child);
+    }
+
     // TODO: loop instead of recurring to avoid blowing the stack.
     pub fn from_traversal<I: Iterator<Item=(T, I)>>(data: T, children: I) -> Self {
         let mut t = Tree { data: data, children: vec![], };
