@@ -119,6 +119,78 @@ pub trait Nav<'a> {
     fn data(&self) -> <Self as Nav<'a>>::DataGuard;
 }
 
+// TODO: factor tree navigation common to Zipper and Nav to put it into a single
+// Nav trait alongside two separate Zipper and View traits.
+pub trait Zipper {
+    type Data;
+    type Tree;
+    fn stitch<I>(data: <Self as Zipper>::Data, children: I) where I: Iterator<Item=Self>;
+    fn leaf(data: <Self as Zipper>::Data) -> Self;
+    fn build(self) -> <Self as Zipper>::Tree;
+    fn seek_child(&mut self, index: usize);
+    fn child_count(&self) -> usize;
+    fn seek_sibling(&mut self, offset: isize);
+    fn at_root(&self) -> bool;
+    fn at_leaf(&self) -> bool;
+    fn to_parent(&mut self);
+    fn to_root(&mut self) {
+        while ! self.at_root() {
+            self.to_parent();
+        }
+    }
+    fn data(&self) -> &<Self as Zipper>::Data;
+    fn data_mut(&mut self) -> &mut <Self as Zipper>::Data;
+    fn set_data(&mut self, data: <Self as Zipper>::Data);
+    fn push_child(&mut self, child: Self);
+    fn insert_child(&mut self, index: usize, child: Self);
+    fn remove(&mut self) -> Self;
+    fn remove_child(&mut self, index: usize) -> Self;
+    fn remove_sibling(&mut self, offset: isize) -> Self;
+}
+
+pub struct ZipperNav<'a, Z> where Z: Zipper + 'a {
+    zipper: &'a mut Z,
+}
+
+impl<'a, Z: Zipper> Nav<'a> for ZipperNav<'a, Z> {
+    type Data = <Z as Zipper>::Data;
+    // we can't actually fulfill the Guard contract here because we may realloc
+    // or do other nasty things when navigating the tree.
+    type DataGuard = ???;
+
+    fn child_count(&self) -> usize {
+        self.zipper.child_count()
+    }
+
+    fn at_leaf(&self) -> bool {
+        self.zipper.at_leaf()
+    }
+
+    fn at_root(&self) -> bool {
+        self.zipper.at_root()
+    }
+
+    fn seek_sibling(&mut self, offset: isize) {
+        self.zipper.seek_sibling(offset);
+    }
+
+    fn seek_child(&mut self, index: usize) {
+        self.zipper.seek_child(index);
+    }
+
+    fn to_parent(&mut self) {
+        self.zipper.to_parent();
+    }
+
+    fn to_root(&mut self) {
+        self.zipper.to_root();
+    }
+
+    fn data(&self) -> <Self as Nav<'a>>::DataGuard {
+        self.zipper.data()
+    }
+}
+
 // pub trait Treeish {
 //     type Data;
 //     type DataGuard: Deref<Target=<Self as Treeish>::Data>;
