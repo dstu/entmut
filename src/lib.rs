@@ -13,6 +13,9 @@ pub mod fixed;
 pub mod owned;
 pub mod shared;
 
+/// Tree traversal methods and interfaces.
+pub mod traversal;
+
 mod util;
 
 use std::mem;
