@@ -1,8 +1,9 @@
 use ::{Guard, Nav};
+use ::traversal::Queue;
 use ::util::{ChildIndex, SiblingIndex};
 
 use std::clone::Clone;
-// use std::iter::Iterator;
+use std::iter::Iterator;
 
 /// Fixed-layout tree with good memory locality guarantees.
 ///
@@ -19,44 +20,46 @@ pub struct Tree<T> {
 }
 
 impl<T> Tree<T> {
-    // pub fn new<I: Iterator<Item=(T, I)>>(data: T, children: I) -> Self {
-    //     let mut tree = Tree::empty();
-    //     tree.data.push(data);
-    //     tree.offsets.push(offset);
-    //     tree.build(0us, children);
-    //     return tree;
-    // }
+    /// Constructs a tree based on the ordering imposed by a traversal.
+    ///
+    /// In the resulting tree, nodes will be laid out in memory in the same
+    /// order in which they are visited by the traversal imposed by `queue`.
+    pub fn from_traversal<Q, I>(mut queue: Q, data: T, children: I) -> Self
+        where Q: Queue<(usize, usize, T, I)>, I: Iterator<Item=(T, I)> {
+            let mut tree = Tree { data: Vec::new(), offsets: Vec::new(), children: Vec::new(), };
+            tree.data.push(data);
+            tree.offsets.push(0);
+            {
+                let mut child_index = 0usize;
+                for (data, children) in children {
+                    queue.unshift((0, child_index, data, children));
+                    child_index += 1;
+                    tree.children.push(0);
+                }
+            }
+            loop {
+                match queue.shift() {
+                    None => return tree,
+                    Some((parent_index, index, data, children)) => {
+                        tree.data.push(data);
+                        tree.offsets.push(tree.children.len());
+                        tree.children[tree.offsets[parent_index] + index] = index;
+                        let mut child_index = 0usize;
+                        for (data, children) in children {
+                            queue.unshift((index, child_index, data, children));
+                            child_index += 1;
+                            tree.children.push(0);
+                        }
+                    }
+                }
+            }
+        }
 
-    // fn build<I: Iterator<Item=(T, I)>>(&mut self, node: usize, children: I) {
-    //     let mut i = 0us;
-    //     for (child_data, child_children) in children {
-    //         self.data.push(child_data);
-    //         i += 1;
-    //         self.children.push(node + i);
-    //     }
-    //     self.offsets.push(self.offsets[self.offsets.len() - 1] + i);
-    // }
-
-    pub fn empty() -> Self {
-        Tree { data: vec![], offsets: vec![], children: vec![], }
+    /// Constructs a new tree with no children and the given data.
+    pub fn leaf(data: T) -> Self {
+        Tree { data: vec![data], offsets: vec![0], children: Vec::new(), }
     }
 
-    // pub fn add_node<I: Iterator<Item=T>>
-    //   (&mut self, parent: usize, children: &mut I) {
-    //     assert![parent == self.size()];
-    //     loop {
-    //         let mut child_index = 0us;
-    //         let mut child_count = 0us;
-    //         match children.next() {
-    //             None => break,
-    //             Some(c) => {
-                    
-    //             },
-    //         }
-    //     }
-
-    // }
-    
     pub fn size(&self) -> usize {
         self.data.len()
     }
