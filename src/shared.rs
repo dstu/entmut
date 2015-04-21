@@ -12,7 +12,7 @@ struct TreeInternal<T> {
     data: T, children: RefCell<Vec<Tree<T>>>,
 }
 
-/// Reference to a heap-allocated to a tree.
+/// Reference to a heap-allocated tree.
 /// 
 /// This tree structure has the same characteristics as
 /// [owned::Tree](../owned/struct.Tree.html), except that a parent does not own
