@@ -60,8 +60,21 @@ impl<T> Tree<T> {
         Tree { data: vec![data], offsets: vec![0], children: Vec::new(), }
     }
 
+    /// Returns the number of nodes in this tree.
     pub fn size(&self) -> usize {
         self.data.len()
+    }
+
+    /// Returns a borrowed view of the nodes, in the order in which they are
+    /// stored.
+    pub fn nodes(&self) -> &[T] {
+        &self.data
+    }
+
+    /// Returns a borrowed mutable view of the nodes, in the order in which they
+    /// are stored.
+    pub fn nodes_mut(&mut self) -> &mut [T] {
+        &mut self.data
     }
 
     fn child_count(&self, index: usize) -> usize {
