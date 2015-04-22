@@ -1,4 +1,4 @@
-use ::{Guard, Nav};
+use ::{Guard, Nav, View};
 use ::util::{ChildIndex, SiblingIndex};
 
 use std::clone::Clone;
@@ -47,8 +47,8 @@ impl<T> Tree<T> {
         return t;
     }
 
-    pub fn nav<'s>(&'s self) -> Navigator<'s, T> {
-        Navigator::new(self)
+    pub fn view<'s>(&'s self) -> TreeView<'s, T> {
+        TreeView::new(self)
     }
 }
 
@@ -62,27 +62,32 @@ impl<'a, T: 'a> Guard<'a, T> for DataGuard<'a, T> {
     }
 }
 
-pub struct Navigator<'a, T: 'a> {
+pub struct TreeView<'a, T: 'a> {
     here: &'a Tree<T>,
     path: Vec<(&'a Tree<T>, usize)>,
 }
 
-impl<'a, T: 'a> Navigator<'a, T> {
+impl<'a, T: 'a> TreeView<'a, T> {
     fn new(tree: &'a Tree<T>) -> Self {
-        Navigator { here: tree, path: Vec::new(), }
+        TreeView { here: tree, path: Vec::new(), }
     }
 }
 
-impl<'a, T: 'a> Clone for Navigator<'a, T> {
+impl<'a, T: 'a> Clone for TreeView<'a, T> {
     fn clone(&self) -> Self {
-        Navigator { here: self.here, path: self.path.clone(), }
+        TreeView { here: self.here, path: self.path.clone(), }
     }
 }
 
-impl<'a, T: 'a> Nav<'a> for Navigator<'a, T> {
+impl<'a, T: 'a> View<'a> for TreeView<'a, T> {
     type Data = T;
     type DataGuard = DataGuard<'a, T>;
+    fn data(&self) -> DataGuard<'a, T> {
+        DataGuard { tree: self.here, }
+    }
+}
 
+impl<'a, T: 'a> Nav for TreeView<'a, T> {
     fn seek_sibling(&mut self, offset: isize) {
         let new_index = {
             if self.at_root() {
@@ -125,9 +130,5 @@ impl<'a, T: 'a> Nav<'a> for Navigator<'a, T> {
             self.here = parent;
             self.path.clear();
         }
-    }
-
-    fn data(&self) -> DataGuard<'a, T> {
-        DataGuard { tree: self.here, }
     }
 }

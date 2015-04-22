@@ -1,4 +1,4 @@
-use ::{Guard, Nav};
+use ::{Guard, Nav, View};
 use ::util::{ChildIndex, SiblingIndex};
 
 use std::cell::{Ref, RefCell};
@@ -44,8 +44,8 @@ impl<T> Tree<T> {
         self.internal.children.borrow_mut().insert(index, child);
     }
 
-    pub fn nav<'s>(&'s self) -> Navigator<'s, T> {
-        Navigator::new(self)
+    pub fn view<'s>(&'s self) -> TreeView<'s, T> {
+        TreeView::new(self)
     }
 }
 
@@ -69,14 +69,14 @@ impl<'a, T: 'a> Guard<'a, T> for DataGuard<T> {
     }
 }
 
-pub struct Navigator<'a, T: 'a> {
+pub struct TreeView<'a, T: 'a> {
     root: &'a Tree<T>,
     path: Vec<(Ref<'a, Vec<Tree<T>>>, usize)>,
 }
 
-impl<'a, T: 'a> Navigator<'a, T> {
+impl<'a, T: 'a> TreeView<'a, T> {
     fn new(root: &'a Tree<T>) -> Self {
-        Navigator { root: root, path: Vec::new(), }
+        TreeView { root: root, path: Vec::new(), }
     }
 
     fn here<'s>(&'s self) -> &'s Tree<T> {
@@ -90,10 +90,10 @@ impl<'a, T: 'a> Navigator<'a, T> {
 /// Due to the internal representation of the path back from the tree root, this
 /// `Clone` implementation retraces the path from the root. This may be less
 /// efficient than is desirable.
-impl<'a, T: 'a> Clone for Navigator<'a, T> {
+impl<'a, T: 'a> Clone for TreeView<'a, T> {
     fn clone(&self) -> Self {
         // We can't clone self.path directly, so we rebuild it by hand.
-        let mut new_nav = Navigator { root: self.root, path: Vec::new(), };
+        let mut new_nav = TreeView { root: self.root, path: Vec::new(), };
         new_nav.path.reserve(self.path.len());
         for &(_, index) in &self.path {
             new_nav.seek_child(index);
@@ -102,10 +102,15 @@ impl<'a, T: 'a> Clone for Navigator<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Nav<'a> for Navigator<'a, T> {
+impl<'a, T: 'a> View<'a> for TreeView<'a, T> {
     type Data = T;
     type DataGuard = DataGuard<T>;
+    fn data(&self) -> DataGuard<T> {
+        DataGuard { tree: self.here().clone(), }
+    }
+}
 
+impl<'a, T: 'a> Nav for TreeView<'a, T> {
     fn seek_sibling(&mut self, offset: isize) {
         let new_index = 
             match self.path.last() {
@@ -140,9 +145,5 @@ impl<'a, T: 'a> Nav<'a> for Navigator<'a, T> {
 
     fn to_root(&mut self) {
         self.path.clear();
-    }
-
-    fn data(&self) -> DataGuard<T> {
-        DataGuard { tree: self.here().clone(), }
     }
 }

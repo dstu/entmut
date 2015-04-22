@@ -1,4 +1,4 @@
-use ::{Guard, Nav};
+use ::{Guard, Nav, View};
 use ::traversal::Queue;
 use ::util::{ChildIndex, SiblingIndex};
 
@@ -109,26 +109,23 @@ impl<'a, T: 'a> Guard<'a, T> for DataGuard<'a, T> {
     }
 }
 
-pub struct Navigator<'a, T: 'a> {
+pub struct TreeView<'a, T: 'a> {
     tree: &'a Tree<T>, path: Vec<usize>,
 }
 
-impl<'a, T: 'a> Navigator<'a, T> {
+impl<'a, T: 'a> TreeView<'a, T> {
     fn index(&self) -> usize {
         self.path[self.path.len() - 1]
     }
 }
 
-impl<'a, T: 'a> Clone for Navigator<'a, T> {
+impl<'a, T: 'a> Clone for TreeView<'a, T> {
     fn clone(&self) -> Self {
-        Navigator { tree: self.tree, path: self.path.clone(), }
+        TreeView { tree: self.tree, path: self.path.clone(), }
     }
 }
 
-impl<'a, T: 'a> Nav<'a> for Navigator<'a, T> {
-    type Data = T;
-    type DataGuard = DataGuard<'a, T>;
-
+impl<'a, T: 'a> Nav for TreeView<'a, T> {
     fn seek_sibling(&mut self, offset: isize) {
         let new_index =
             if self.path.len() < 1 {
@@ -173,7 +170,11 @@ impl<'a, T: 'a> Nav<'a> for Navigator<'a, T> {
         self.path.clear();
         self.path.push(0);
     }
+}
 
+impl<'a, T: 'a> View<'a> for TreeView<'a, T> {
+    type Data = T;
+    type DataGuard = DataGuard<'a, T>;
     fn data(&self) -> DataGuard<'a, T> {
         DataGuard { tree: self.tree, index: self.index(), }
     }

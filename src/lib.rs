@@ -43,40 +43,7 @@ impl<'a, T: 'a> Deref for Guard<'a, T> {
     }
 }
 
-/// Navigable fixed-topology view of a tree.
-///
-/// This trait defines a view of a tree that is analogous to a sequential
-/// iterator providing read-only pointers into a structure. At any given point
-/// in time, it can be thought of as pointing to a particular tree node. Methods
-/// are provided for walking the tree and updating which node is pointed at. A
-/// guarded reference to the data at a node can be obtained at any time, with
-/// the lifetime of the reference good for the lifetime of the view of the tree.
-///
-/// If you have worked with
-/// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
-/// seem familiar.
-///
-/// The read-only nature of this view does not guarantee immutability or thread
-/// safety. An internally mutable type for `Data` (like `std::cell::RefCell<T>`)
-/// will permit updates to tree data through this view. The tree topology,
-/// however, should stay fixed.
-///
-/// Implementations of this trait should have their lifetime parameter
-/// constrained by a read-only borrow of a tree structure. It should be safe to
-/// create multiple views of the same structure.
-///
-/// To make it convenient to navigate through a tree and retain pointers along
-/// the way, it is recommended that implementors also provide an implementation
-/// of `std::clone::Clone`.
-pub trait Nav<'a> {
-    /// Type of data structures held at tree nodes.
-    ///
-    /// E.g., the `T` of some `Tree<T>`.
-    type Data;
-
-    /// Concrete guard implementation.
-    type DataGuard: Guard<'a, <Self as Nav<'a>>::Data>;
-
+pub trait Nav {
     /// Returns the number of children of the current node.
     fn child_count(&self) -> usize;
 
@@ -113,83 +80,108 @@ pub trait Nav<'a> {
             self.to_parent();
         }
     }
+}
+
+/// Navigable fixed-topology view of a tree.
+///
+/// This trait defines a view of a tree that is analogous to a sequential
+/// iterator providing read-only pointers into a structure. At any given point
+/// in time, it can be thought of as pointing to a particular tree node. Methods
+/// are provided for walking the tree and updating which node is pointed at. A
+/// guarded reference to the data at a node can be obtained at any time, with
+/// the lifetime of the reference good for the lifetime of the view of the tree.
+///
+/// If you have worked with
+/// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
+/// seem familiar.
+///
+/// The read-only nature of this view does not guarantee immutability or thread
+/// safety. An internally mutable type for `Data` (like `std::cell::RefCell<T>`)
+/// will permit updates to tree data through this view. The tree topology,
+/// however, should stay fixed.
+///
+/// Implementations of this trait should have their lifetime parameter
+/// constrained by a read-only borrow of a tree structure. It should be safe to
+/// create multiple views of the same structure.
+///
+/// To make it convenient to navigate through a tree and retain pointers along
+/// the way, it is recommended that implementors also provide an implementation
+/// of `std::clone::Clone`.
+pub trait View<'a>: Nav {
+    /// Type of data structures held at tree nodes.
+    ///
+    /// E.g., the `T` of some `Tree<T>`.
+    type Data;
+
+    /// Concrete guard implementation.
+    type DataGuard: Guard<'a, <Self as View<'a>>::Data>;
 
     /// Returns this node's data. The guard that is returned should be viable
     /// for the lifetime of this view.
-    fn data(&self) -> <Self as Nav<'a>>::DataGuard;
+    fn data(&self) -> <Self as View<'a>>::DataGuard;
 }
 
-// TODO: factor tree navigation common to Zipper and Nav to put it into a single
-// Nav trait alongside two separate Zipper and View traits.
-pub trait Zipper {
+pub trait Zipper: Nav {
     type Data;
     type Tree;
-    fn stitch<I>(data: <Self as Zipper>::Data, children: I) where I: Iterator<Item=Self>;
     fn leaf(data: <Self as Zipper>::Data) -> Self;
     fn build(self) -> <Self as Zipper>::Tree;
-    fn seek_child(&mut self, index: usize);
-    fn child_count(&self) -> usize;
-    fn seek_sibling(&mut self, offset: isize);
-    fn at_root(&self) -> bool;
-    fn at_leaf(&self) -> bool;
-    fn to_parent(&mut self);
-    fn to_root(&mut self) {
-        while ! self.at_root() {
-            self.to_parent();
-        }
-    }
+    fn stitch<I>(data: <Self as Zipper>::Data, children: I) where I: Iterator<Item=Self>;
+    fn asplode(self) -> (<Self as Zipper>::Data, Vec<Self>);
     fn data(&self) -> &<Self as Zipper>::Data;
     fn data_mut(&mut self) -> &mut <Self as Zipper>::Data;
     fn set_data(&mut self, data: <Self as Zipper>::Data);
     fn push_child(&mut self, child: Self);
     fn insert_child(&mut self, index: usize, child: Self);
+    fn insert_sibling(&mut self, offset: isize, sibling: Self);
+    fn push_sibling(&mut self, sibling: Self);
     fn remove(&mut self) -> Self;
     fn remove_child(&mut self, index: usize) -> Self;
     fn remove_sibling(&mut self, offset: isize) -> Self;
 }
 
-pub struct ZipperNav<'a, Z> where Z: Zipper + 'a {
-    zipper: &'a mut Z,
-}
+// pub struct ZipperNav<'a, Z> where Z: Zipper + 'a {
+//     zipper: &'a mut Z,
+// }
 
-impl<'a, Z: Zipper> Nav<'a> for ZipperNav<'a, Z> {
-    type Data = <Z as Zipper>::Data;
-    // we can't actually fulfill the Guard contract here because we may realloc
-    // or do other nasty things when navigating the tree.
-    type DataGuard = ???;
+// impl<'a, Z: Zipper> Nav<'a> for ZipperNav<'a, Z> {
+//     type Data = <Z as Zipper>::Data;
+//     // we can't actually fulfill the Guard contract here because we may realloc
+//     // or do other nasty things when navigating the tree.
+//     type DataGuard = ???;
 
-    fn child_count(&self) -> usize {
-        self.zipper.child_count()
-    }
+//     fn child_count(&self) -> usize {
+//         self.zipper.child_count()
+//     }
 
-    fn at_leaf(&self) -> bool {
-        self.zipper.at_leaf()
-    }
+//     fn at_leaf(&self) -> bool {
+//         self.zipper.at_leaf()
+//     }
 
-    fn at_root(&self) -> bool {
-        self.zipper.at_root()
-    }
+//     fn at_root(&self) -> bool {
+//         self.zipper.at_root()
+//     }
 
-    fn seek_sibling(&mut self, offset: isize) {
-        self.zipper.seek_sibling(offset);
-    }
+//     fn seek_sibling(&mut self, offset: isize) {
+//         self.zipper.seek_sibling(offset);
+//     }
 
-    fn seek_child(&mut self, index: usize) {
-        self.zipper.seek_child(index);
-    }
+//     fn seek_child(&mut self, index: usize) {
+//         self.zipper.seek_child(index);
+//     }
 
-    fn to_parent(&mut self) {
-        self.zipper.to_parent();
-    }
+//     fn to_parent(&mut self) {
+//         self.zipper.to_parent();
+//     }
 
-    fn to_root(&mut self) {
-        self.zipper.to_root();
-    }
+//     fn to_root(&mut self) {
+//         self.zipper.to_root();
+//     }
 
-    fn data(&self) -> <Self as Nav<'a>>::DataGuard {
-        self.zipper.data()
-    }
-}
+//     fn data(&self) -> <Self as Nav<'a>>::DataGuard {
+//         self.zipper.data()
+//     }
+// }
 
 // pub trait Treeish {
 //     type Data;
