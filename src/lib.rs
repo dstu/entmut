@@ -121,6 +121,44 @@ pub trait View<'a>: Nav {
     fn data(&self) -> <Self as View<'a>>::DataGuard;
 }
 
+pub trait ViewMut<'a>: Nav {
+    type Data;
+    type Tree;
+
+    fn data(&self) -> &<Self as ViewMut<'a>>::Data;
+
+    fn data_mut(&mut self) -> &mut <Self as ViewMut<'a>>::Data;
+
+    fn set_data(&mut self, data: <Self as ViewMut<'a>>::Data);
+
+    fn push_leaf(&mut self, data: <Self as ViewMut<'a>>::Data);
+
+    fn push_child(&mut self, child: <Self as ViewMut<'a>>::Tree);
+
+    fn insert_leaf(&mut self, index: usize, data: <Self as ViewMut<'a>>::Data);
+    
+    fn insert_child(
+        &mut self, index: usize, child: <Self as ViewMut<'a>>::Tree);
+
+    fn insert_sibling_leaf(
+        &mut self, offset: isize, data: <Self as ViewMut<'a>>::Data);
+
+    fn insert_sibling(
+        &mut self, offset: isize, sibling: <Self as ViewMut<'a>>::Tree);
+
+    fn remove(&mut self) -> <Self as ViewMut<'a>>::Tree;
+
+    fn remove_child(&mut self, index: usize) -> <Self as ViewMut<'a>>::Tree;
+
+    fn remove_sibling(&mut self, offset: isize) -> <Self as ViewMut<'a>>::Tree;
+
+    fn swap(&mut self, other: &mut <Self as ViewMut<'a>>::Tree);
+
+    fn swap_children(&mut self, index_a: usize, index_b: usize);
+
+    fn swap_siblings(&mut self, offset_a: isize, offset_b: isize);
+}
+
 pub trait Zipper: Nav {
     type Data;
     type Tree;
