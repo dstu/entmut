@@ -1,4 +1,4 @@
-use ::{Guard, Nav, View};
+use ::{Guard, Nav, View, Zipper};
 use ::util::{ChildIndex, SiblingIndex};
 
 use std::cell::{Ref, RefCell};

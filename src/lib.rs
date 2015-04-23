@@ -126,18 +126,19 @@ pub trait Zipper: Nav {
     type Tree;
     fn leaf(data: <Self as Zipper>::Data) -> Self;
     fn build(self) -> <Self as Zipper>::Tree;
-    fn stitch<I>(data: <Self as Zipper>::Data, children: I) where I: Iterator<Item=Self>;
-    fn asplode(self) -> (<Self as Zipper>::Data, Vec<Self>);
+    // fn stitch<I>(data: <Self as Zipper>::Data, children: I) -> Self
+    //     where I: Iterator<Item=Self>;
+    // fn asplode(self) -> (<Self as Zipper>::Data, Vec<Self>);
     fn data(&self) -> &<Self as Zipper>::Data;
     fn data_mut(&mut self) -> &mut <Self as Zipper>::Data;
     fn set_data(&mut self, data: <Self as Zipper>::Data);
     fn push_child(&mut self, child: Self);
     fn insert_child(&mut self, index: usize, child: Self);
-    fn insert_sibling(&mut self, offset: isize, sibling: Self);
-    fn push_sibling(&mut self, sibling: Self);
-    fn remove(&mut self) -> Self;
-    fn remove_child(&mut self, index: usize) -> Self;
-    fn remove_sibling(&mut self, offset: isize) -> Self;
+    // fn insert_sibling(&mut self, offset: isize, sibling: Self);
+    // fn push_sibling(&mut self, sibling: Self);
+    // fn remove(&mut self) -> Self;
+    // fn remove_child(&mut self, index: usize) -> Self;
+    // fn remove_sibling(&mut self, offset: isize) -> Self;
 }
 
 // pub struct ZipperNav<'a, Z> where Z: Zipper + 'a {
