@@ -1,4 +1,4 @@
-use ::{Guard, Nav, View, ViewMut};
+use ::{Guard, Editor, Nav, View, ViewMut};
 use ::util::{ChildIndex, SiblingIndex};
 
 use std::clone::Clone;
@@ -205,9 +205,8 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
     }
 }
 
-impl<'a, T: 'a> ViewMut<'a> for TreeViewMut<'a, T> {
+impl<'a, T: 'a> ViewMut for TreeViewMut<'a, T> {
     type Data = T;
-    type Tree = Tree<T>;
 
     fn data(&self) -> &T {
         & self.here().data
@@ -220,6 +219,11 @@ impl<'a, T: 'a> ViewMut<'a> for TreeViewMut<'a, T> {
     fn set_data(&mut self, data: T) {
         self.here_mut().data = data;
     }
+}
+
+impl<'a, T: 'a> Editor for TreeViewMut<'a, T> {
+    type Data = T;
+    type Tree = Tree<T>;
 
     fn push_leaf(&mut self, data: T) {
         self.push_child(Tree::leaf(data));
