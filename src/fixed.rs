@@ -1,4 +1,4 @@
-use ::{Guard, Nav, View};
+use ::{Guard, Nav, View, ViewMut};
 use ::traversal::Queue;
 use ::util::{ChildIndex, SiblingIndex};
 
@@ -177,5 +177,58 @@ impl<'a, T: 'a> View<'a> for TreeView<'a, T> {
     type DataGuard = DataGuard<'a, T>;
     fn data(&self) -> DataGuard<'a, T> {
         DataGuard { tree: self.tree, index: self.index(), }
+    }
+}
+
+pub struct TreeViewMut<'a, T: 'a> {
+    tree: &'a mut Tree<T>,
+    path: Vec<usize>,
+}
+
+impl<'a, T> TreeViewMut<'a, T> {
+    fn index(&self) -> usize {
+        *self.path.last().unwrap()
+    }
+}
+
+impl<'a, T: 'a> ViewMut for TreeViewMut<'a, T> {
+    type Data = T;
+
+    fn data(&self) -> &T { &self.tree.data[self.index()] }
+
+    fn data_mut(&mut self) -> &mut T {
+        let index = self.index();
+        &mut self.tree.data[index]
+    }
+
+    fn set_data(&mut self, data: T) {
+        let index = self.index();
+        self.tree.data[index] = data;
+    }
+}
+
+impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
+    fn seek_sibling(&mut self, offset: isize) {
+    }
+
+    fn seek_child(&mut self, index: usize) {
+    }
+
+    fn child_count(&self) -> usize {
+        self.tree.child_count(self.index())
+    }
+
+    fn at_root(&self) -> bool {
+        self.path.len() == 1
+    }
+
+    fn to_parent(&mut self) {
+        assert![self.path.len() <= 1, "already at root"];
+        self.path.pop();
+    }
+
+    fn to_root(&mut self) {
+        self.path.clear();
+        self.path.push(0);
     }
 }
