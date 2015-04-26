@@ -8,7 +8,7 @@
 //  - Shared-topology tree (data fixed).
 //  - Shared-data, shared-topology tree.
 
-/// Fixed-layout tree with good memory locality guarantees.
+/// Fixed-layout trees with good memory locality guarantees.
 pub mod fixed;
 // pub mod linked;
 /// Single-ownership trees wherein a parent owns its children.
