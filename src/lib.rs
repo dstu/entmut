@@ -27,9 +27,7 @@ mod util;
 /// This trait defines a view of a tree that is analogous to a sequential
 /// iterator providing read-only pointers into a structure. At any given point
 /// in time, it can be thought of as pointing to a particular tree node. Methods
-/// are provided for walking the tree and updating which node is pointed at. A
-/// guarded reference to the data at a node can be obtained at any time, with
-/// the lifetime of the reference good for the lifetime of the view of the tree.
+/// are provided for walking the tree and updating which node is pointed at.
 ///
 /// If you have worked with
 /// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
