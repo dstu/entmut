@@ -1,6 +1,7 @@
-use ::{Guard, Editor, Nav, View};
+use ::{Editor, Nav};
 use ::util::{ChildIndex, SiblingIndex};
 
+use std::borrow::Borrow;
 use std::cell::{Ref, RefCell, RefMut};
 use std::clone::Clone;
 use std::mem;
@@ -57,18 +58,6 @@ impl<T> Clone for Tree<T> {
     }
 }
 
-pub struct DataGuard<T> {
-    tree: Tree<T>,
-}
-
-impl<'a, T: 'a> Guard<'a, T> for DataGuard<T> {
-    fn super_deref<'s>(&'s self) -> &'a T {
-        unsafe {
-            mem::transmute(&self.tree.internal.data)
-        }
-    }
-}
-
 pub struct TreeView<'a, T: 'a> {
     root: &'a Tree<T>,
     path: Vec<(Ref<'a, Vec<Tree<T>>>, usize)>,
@@ -102,11 +91,9 @@ impl<'a, T: 'a> Clone for TreeView<'a, T> {
     }
 }
 
-impl<'a, T: 'a> View<'a> for TreeView<'a, T> {
-    type Data = T;
-    type DataGuard = DataGuard<T>;
-    fn data(&self) -> DataGuard<T> {
-        DataGuard { tree: self.here().clone(), }
+impl<'a, T: 'a> Borrow<T> for TreeView<'a, T> {
+    fn borrow(&self) -> &T {
+        &self.here().internal.data
     }
 }
 
@@ -209,6 +196,12 @@ impl<'a, T: 'a> Nav for TreeEditor<'a, T> {
 
     fn to_root(&mut self) {
         self.path.clear();
+    }
+}
+
+impl<'a, T: 'a> Borrow<T> for TreeEditor<'a, T> {
+    fn borrow(&self) -> &T {
+        &self.here().internal.data
     }
 }
 

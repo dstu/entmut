@@ -1,7 +1,8 @@
-use ::{Guard, Nav, View, ViewMut};
+use ::Nav;
 use ::traversal::Queue;
 use ::util::{ChildIndex, SiblingIndex};
 
+use std::borrow::{Borrow, BorrowMut};
 use std::clone::Clone;
 use std::intrinsics;
 use std::iter::Iterator;
@@ -100,20 +101,6 @@ impl<T> Tree<T> {
     }
 }
 
-pub struct DataGuard<'a, T: 'a> {
-    tree: &'a Tree<T>,
-    position: TreePosition,
-}
-
-impl<'a, T: 'a> Guard<'a, T> for DataGuard<'a, T> {
-    fn super_deref<'s>(&'s self) -> &'a T {
-        match self.position {
-            TreePosition::Root => &self.tree.data[0],
-            TreePosition::Nonroot(data) => &self.tree.data[data.tree_index],
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
 enum TreePosition {
     Root,
@@ -144,6 +131,15 @@ impl<'a, T: 'a> TreeView<'a, T> {
 impl<'a, T: 'a> Clone for TreeView<'a, T> {
     fn clone(&self) -> Self {
         TreeView { tree: self.tree, path: self.path.clone(), }
+    }
+}
+
+impl<'a, T: 'a> Borrow<T> for TreeView<'a, T> {
+    fn borrow(&self) -> &T {
+        match self.here() {
+            TreePosition::Root => &self.tree.data[0],
+            TreePosition::Nonroot(data) => &self.tree.data[data.tree_index],
+        }
     }
 }
 
@@ -204,14 +200,6 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
     }
 }
 
-impl<'a, T: 'a> View<'a> for TreeView<'a, T> {
-    type Data = T;
-    type DataGuard = DataGuard<'a, T>;
-    fn data(&self) -> DataGuard<'a, T> {
-        DataGuard { tree: self.tree, position: self.here(), }
-    }
-}
-
 pub struct TreeViewMut<'a, T: 'a> {
     tree: &'a mut Tree<T>,
     path: Vec<TreePosition>,
@@ -223,27 +211,20 @@ impl<'a, T> TreeViewMut<'a, T> {
     }
 }
 
-impl<'a, T: 'a> ViewMut for TreeViewMut<'a, T> {
-    type Data = T;
-
-    fn data(&self) -> &T {
+impl<'a, T: 'a> Borrow<T> for TreeViewMut<'a, T> {
+    fn borrow(&self) -> &T {
         match self.here() {
             TreePosition::Root => &self.tree.data[0],
-            TreePosition::Nonroot(data) => &self.tree.data[data.tree_index]
+            TreePosition::Nonroot(data) => &self.tree.data[data.tree_index],
         }
     }
+}
 
-    fn data_mut(&mut self) -> &mut T {
+impl<'a, T: 'a> BorrowMut<T> for TreeViewMut<'a, T> {
+    fn borrow_mut(&mut self) -> &mut T {
         match self.here() {
             TreePosition::Root => &mut self.tree.data[0],
             TreePosition::Nonroot(data) => &mut self.tree.data[data.tree_index],
-        }
-    }
-
-    fn set_data(&mut self, new_data: T) {
-        match self.here() {
-            TreePosition::Root => self.tree.data[0] = new_data,
-            TreePosition::Nonroot(data) => self.tree.data[data.tree_index] = new_data,
         }
     }
 }

@@ -13,39 +13,39 @@
 
 /// Fixed-layout trees with good memory locality guarantees.
 pub mod fixed;
-// pub mod linked;
 /// Single-ownership trees wherein a parent owns its children.
 pub mod owned;
 /// Heap-allocated, reference-counted trees that can be shared freely.
 pub mod shared;
 /// Tree traversal methods and interfaces.
 pub mod traversal;
-
+/// Internal utilities.
 mod util;
 
-use std::mem;
-use std::ops::Deref;
-
-/// Accessor trait that provides a fixed-lifetime read-only reference to
-/// data.
+/// Navigable fixed-topology view of a tree.
 ///
-/// This is used by read-only views of a tree structure, with the lifetime of
-/// the guard pinned to the lifetime of the view. If a tree implementation
-/// allows internal mutability (via the use of `RefCell` or otherwise), then
-/// this does not guarantee that the data will not change.
-pub trait Guard<'a, T: 'a> {
-    fn super_deref<'s>(&'s self) -> &'a T;
-}
-
-impl<'a, T: 'a> Deref for Guard<'a, T> {
-    type Target = T;
-    fn deref<'s>(&'s self) -> &'s T {
-        unsafe {
-            mem::transmute(self.super_deref())
-        }
-    }
-}
-
+/// This trait defines a view of a tree that is analogous to a sequential
+/// iterator providing read-only pointers into a structure. At any given point
+/// in time, it can be thought of as pointing to a particular tree node. Methods
+/// are provided for walking the tree and updating which node is pointed at. A
+/// guarded reference to the data at a node can be obtained at any time, with
+/// the lifetime of the reference good for the lifetime of the view of the tree.
+///
+/// If you have worked with
+/// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
+/// seem familiar.
+///
+/// For access to data at tree nodes, implementing types should provide an
+/// implementation of `std::borrow::Borrow` or `std::borrow::BorrowMut`.
+///
+/// The read-only nature of this view does not guarantee immutability or thread
+/// safety. Trees with an internall internally mutable node type (like
+/// `std::cell::RefCell<T>`) may permit updates to tree data through this
+/// view. The tree topology, however, should stay fixed.
+///
+/// To make it convenient to navigate through a tree and retain pointers along
+/// the way, it is recommended that implementors also provide an implementation
+/// of `std::clone::Clone`.
 pub trait Nav {
     /// Returns the number of children of the current node.
     fn child_count(&self) -> usize;
@@ -83,55 +83,6 @@ pub trait Nav {
             self.to_parent();
         }
     }
-}
-
-/// Navigable fixed-topology view of a tree.
-///
-/// This trait defines a view of a tree that is analogous to a sequential
-/// iterator providing read-only pointers into a structure. At any given point
-/// in time, it can be thought of as pointing to a particular tree node. Methods
-/// are provided for walking the tree and updating which node is pointed at. A
-/// guarded reference to the data at a node can be obtained at any time, with
-/// the lifetime of the reference good for the lifetime of the view of the tree.
-///
-/// If you have worked with
-/// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
-/// seem familiar.
-///
-/// The read-only nature of this view does not guarantee immutability or thread
-/// safety. An internally mutable type for `Data` (like `std::cell::RefCell<T>`)
-/// will permit updates to tree data through this view. The tree topology,
-/// however, should stay fixed.
-///
-/// Implementations of this trait should have their lifetime parameter
-/// constrained by a read-only borrow of a tree structure. It should be safe to
-/// create multiple views of the same structure.
-///
-/// To make it convenient to navigate through a tree and retain pointers along
-/// the way, it is recommended that implementors also provide an implementation
-/// of `std::clone::Clone`.
-pub trait View<'a>: Nav {
-    /// Type of data structures held at tree nodes.
-    ///
-    /// E.g., the `T` of some `Tree<T>`.
-    type Data;
-
-    /// Concrete guard implementation.
-    type DataGuard: Guard<'a, <Self as View<'a>>::Data>;
-
-    /// Returns this node's data. The guard that is returned should be viable
-    /// for the lifetime of this view.
-    fn data(&self) -> <Self as View<'a>>::DataGuard;
-}
-
-pub trait ViewMut: Nav {
-    type Data;
-
-    fn data(&self) -> &<Self as ViewMut>::Data;
-
-    fn data_mut(&mut self) -> &mut <Self as ViewMut>::Data;
-
-    fn set_data(&mut self, data: <Self as ViewMut>::Data);
 }
 
 pub trait Editor: Nav {

@@ -1,6 +1,7 @@
-use ::{Guard, Editor, Nav, View, ViewMut};
+use ::{Editor, Nav};
 use ::util::{ChildIndex, SiblingIndex};
 
+use std::borrow::{Borrow, BorrowMut};
 use std::clone::Clone;
 use std::iter::Iterator;
 use std::ptr;
@@ -57,16 +58,6 @@ impl<T> Tree<T> {
     }
 }
 
-pub struct DataGuard<'a, T: 'a> {
-    tree: &'a Tree<T>,
-}
-
-impl<'a, T: 'a> Guard<'a, T> for DataGuard<'a, T> {
-    fn super_deref<'s>(&'s self) -> &'a T {
-        &self.tree.data
-    }
-}
-
 pub struct TreeView<'a, T: 'a> {
     here: &'a Tree<T>,
     path: Vec<(&'a Tree<T>, usize)>,
@@ -84,11 +75,9 @@ impl<'a, T: 'a> Clone for TreeView<'a, T> {
     }
 }
 
-impl<'a, T: 'a> View<'a> for TreeView<'a, T> {
-    type Data = T;
-    type DataGuard = DataGuard<'a, T>;
-    fn data(&self) -> DataGuard<'a, T> {
-        DataGuard { tree: self.here, }
+impl<'a, T: 'a> Borrow<T> for TreeView<'a, T> {
+    fn borrow(&self) -> &T {
+        &self.here.data
     }
 }
 
@@ -160,6 +149,18 @@ impl<'a, T: 'a> TreeViewMut<'a, T> {
     }
 }
 
+impl<'a, T: 'a> Borrow<T> for TreeViewMut<'a, T> {
+    fn borrow(&self) -> &T {
+        &self.here().data
+    }
+}
+
+impl<'a, T: 'a> BorrowMut<T> for TreeViewMut<'a, T> {
+    fn borrow_mut(&mut self) -> &mut T {
+        &mut self.here_mut().data
+    }
+}
+
 impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
     fn child_count(&self) -> usize {
         self.here().children.len()
@@ -202,22 +203,6 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
             self.path.clear();
             self.here_ptr = self.tree;
         }
-    }
-}
-
-impl<'a, T: 'a> ViewMut for TreeViewMut<'a, T> {
-    type Data = T;
-
-    fn data(&self) -> &T {
-        & self.here().data
-    }
-
-    fn data_mut(&mut self) -> &mut T {
-        &mut self.here_mut().data
-    }
-
-    fn set_data(&mut self, data: T) {
-        self.here_mut().data = data;
     }
 }
 
