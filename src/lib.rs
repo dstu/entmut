@@ -8,6 +8,9 @@
 //  - Shared-topology tree (data fixed).
 //  - Shared-data, shared-topology tree.
 
+// For std::intrinsics::unreachable.
+#![feature(core)]
+
 /// Fixed-layout trees with good memory locality guarantees.
 pub mod fixed;
 // pub mod linked;

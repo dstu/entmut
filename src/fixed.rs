@@ -3,6 +3,7 @@ use ::traversal::Queue;
 use ::util::{ChildIndex, SiblingIndex};
 
 use std::clone::Clone;
+use std::intrinsics;
 use std::iter::Iterator;
 
 /// Fixed-layout tree with good memory locality guarantees.
@@ -100,23 +101,44 @@ impl<T> Tree<T> {
 }
 
 pub struct DataGuard<'a, T: 'a> {
-    tree: &'a Tree<T>, index: usize,
+    tree: &'a Tree<T>,
+    position: TreePosition,
 }
 
 impl<'a, T: 'a> Guard<'a, T> for DataGuard<'a, T> {
     fn super_deref<'s>(&'s self) -> &'a T {
-        &self.tree.data[self.index]
+        match self.position {
+            TreePosition::Root => &self.tree.data[0],
+            TreePosition::Nonroot(data) => &self.tree.data[data.tree_index],
+        }
     }
+}
+
+#[derive(Clone, Copy)]
+enum TreePosition {
+    Root,
+    Nonroot(TreePositionData),
+}
+
+#[derive(Clone, Copy)]
+struct TreePositionData {
+    // Index into tree array.
+    tree_index: usize,
+    // Index in sequence of children under parent.
+    parent_index: usize,
 }
 
 pub struct TreeView<'a, T: 'a> {
-    tree: &'a Tree<T>, path: Vec<usize>,
+    tree: &'a Tree<T>, path: Vec<TreePosition>,
 }
 
 impl<'a, T: 'a> TreeView<'a, T> {
-    fn index(&self) -> usize {
-        self.path[self.path.len() - 1]
-    }
+    fn here(&self) -> TreePosition {
+        match self.path.last() {
+            None => unsafe { intrinsics::unreachable() },
+            Some(x) => *x,
+        }
+    }    
 }
 
 impl<'a, T: 'a> Clone for TreeView<'a, T> {
@@ -127,34 +149,44 @@ impl<'a, T: 'a> Clone for TreeView<'a, T> {
 
 impl<'a, T: 'a> Nav for TreeView<'a, T> {
     fn seek_sibling(&mut self, offset: isize) {
-        let new_index =
-            if self.path.len() < 1 {
-                SiblingIndex::Root
-            } else {
-                let parent = self.path[self.path.len() - 1];
-                SiblingIndex::compute(self.tree.child_count(parent),
-                                      parent,
-                                      offset)
-            }.unwrap();
-        let offset_index = match self.path.pop() {
-            Some(parent) =>
-                self.tree.child_of(parent, new_index),
-            None =>
-                panic!["tree corruption"],
+        let new_index = match self.path.pop() {
+            None => unsafe { intrinsics::unreachable() },
+            Some(TreePosition::Root) => SiblingIndex::Root,
+            Some(TreePosition::Nonroot(data)) => match self.here() {
+                TreePosition::Root =>
+                    SiblingIndex::compute(self.tree.child_count(0), 0, offset),
+                TreePosition::Nonroot(parent_data) =>
+                    SiblingIndex::compute(self.tree.child_count(parent_data.tree_index),
+                                          data.parent_index,
+                                          offset),
+            },
+        }.unwrap();
+        let tree_index = match self.here() {
+            TreePosition::Root =>
+                self.tree.child_of(0, new_index),
+            TreePosition::Nonroot(data) =>
+                self.tree.child_of(data.tree_index, new_index),
         };
-        self.path.push(offset_index);
+        self.path.push(TreePosition::Nonroot(
+            TreePositionData { tree_index: tree_index, parent_index: new_index, }));
     }
 
     fn seek_child(&mut self, index: usize) {
         let new_index =
             ChildIndex::compute(self.child_count(), index).unwrap();
-        let offset = self.tree.offsets[self.index()];
-        let child = self.tree.children[offset + new_index];
-        self.path.push(child);
+        let tree_index = match self.here() {
+            TreePosition::Root => self.tree.child_of(0, new_index),
+            TreePosition::Nonroot(data) => self.tree.child_of(data.tree_index, new_index),
+        };
+        self.path.push(TreePosition::Nonroot(
+            TreePositionData { tree_index: tree_index, parent_index: new_index, }));
     }
 
     fn child_count(&self) -> usize {
-        self.tree.child_count(self.index())
+        match self.here() {
+            TreePosition::Root => self.tree.child_count(0),
+            TreePosition::Nonroot(data) => self.tree.child_count(data.tree_index),
+        }
     }
 
     fn at_root(&self) -> bool {
@@ -168,7 +200,7 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
 
     fn to_root(&mut self) {
         self.path.clear();
-        self.path.push(0);
+        self.path.push(TreePosition::Root);
     }
 }
 
@@ -176,17 +208,17 @@ impl<'a, T: 'a> View<'a> for TreeView<'a, T> {
     type Data = T;
     type DataGuard = DataGuard<'a, T>;
     fn data(&self) -> DataGuard<'a, T> {
-        DataGuard { tree: self.tree, index: self.index(), }
+        DataGuard { tree: self.tree, position: self.here(), }
     }
 }
 
 pub struct TreeViewMut<'a, T: 'a> {
     tree: &'a mut Tree<T>,
-    path: Vec<usize>,
+    path: Vec<TreePosition>,
 }
 
 impl<'a, T> TreeViewMut<'a, T> {
-    fn index(&self) -> usize {
+    fn here(&self) -> TreePosition {
         *self.path.last().unwrap()
     }
 }
@@ -194,28 +226,68 @@ impl<'a, T> TreeViewMut<'a, T> {
 impl<'a, T: 'a> ViewMut for TreeViewMut<'a, T> {
     type Data = T;
 
-    fn data(&self) -> &T { &self.tree.data[self.index()] }
-
-    fn data_mut(&mut self) -> &mut T {
-        let index = self.index();
-        &mut self.tree.data[index]
+    fn data(&self) -> &T {
+        match self.here() {
+            TreePosition::Root => &self.tree.data[0],
+            TreePosition::Nonroot(data) => &self.tree.data[data.tree_index]
+        }
     }
 
-    fn set_data(&mut self, data: T) {
-        let index = self.index();
-        self.tree.data[index] = data;
+    fn data_mut(&mut self) -> &mut T {
+        match self.here() {
+            TreePosition::Root => &mut self.tree.data[0],
+            TreePosition::Nonroot(data) => &mut self.tree.data[data.tree_index],
+        }
+    }
+
+    fn set_data(&mut self, new_data: T) {
+        match self.here() {
+            TreePosition::Root => self.tree.data[0] = new_data,
+            TreePosition::Nonroot(data) => self.tree.data[data.tree_index] = new_data,
+        }
     }
 }
 
 impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
     fn seek_sibling(&mut self, offset: isize) {
+        let new_index = match self.path.pop() {
+            None => unsafe { intrinsics::unreachable() },
+            Some(TreePosition::Root) => SiblingIndex::Root,
+            Some(TreePosition::Nonroot(data)) => match self.here() {
+                TreePosition::Root =>
+                    SiblingIndex::compute(self.tree.child_count(0), 0, offset),
+                TreePosition::Nonroot(parent_data) =>
+                    SiblingIndex::compute(self.tree.child_count(parent_data.tree_index),
+                                          data.parent_index,
+                                          offset),
+            },
+        }.unwrap();
+        let tree_index = match self.here() {
+            TreePosition::Root =>
+                self.tree.child_of(0, new_index),
+            TreePosition::Nonroot(data) =>
+                self.tree.child_of(data.tree_index, new_index),
+        };
+        self.path.push(TreePosition::Nonroot(
+            TreePositionData { tree_index: tree_index, parent_index: new_index, }));
     }
 
     fn seek_child(&mut self, index: usize) {
+        let new_index =
+            ChildIndex::compute(self.child_count(), index).unwrap();
+        let tree_index = match self.here() {
+            TreePosition::Root => self.tree.child_of(0, new_index),
+            TreePosition::Nonroot(data) => self.tree.child_of(data.tree_index, new_index),
+        };
+        self.path.push(TreePosition::Nonroot(
+            TreePositionData { tree_index: tree_index, parent_index: new_index, }));
     }
 
     fn child_count(&self) -> usize {
-        self.tree.child_count(self.index())
+        match self.here() {
+            TreePosition::Root => self.tree.child_count(0),
+            TreePosition::Nonroot(data) => self.tree.child_count(data.tree_index),
+        }
     }
 
     fn at_root(&self) -> bool {
@@ -229,6 +301,6 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
 
     fn to_root(&mut self) {
         self.path.clear();
-        self.path.push(0);
+        self.path.push(TreePosition::Root);
     }
 }
