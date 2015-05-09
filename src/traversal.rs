@@ -1,4 +1,4 @@
-use ::Nav;
+use ::{Nav, View};
 use std::collections::VecDeque;
 use std::marker::PhantomData;
 
@@ -83,12 +83,12 @@ impl<T> Queue<T> for BreadthQueue<T> {
 
 /// Traverses a tree with a visitor function that is called at each node.
 ///
-/// The traversal starts at the tree location `n` and proceeds through it and
+/// The traversal starts at the tree location `v` and proceeds through it and
 /// all nodes below it in the order defined by `queue`. At each node,
 /// `predicate` is called with a pointer to the current tree node.
-pub fn traverse<'a, N, Q, F>(n: N, mut queue: Q, predicate: F)
-    where N: Nav<'a> + Clone, Q: Queue<N>, F: Fn(N) {
-        queue.unshift(n);
+pub fn traverse<'a, V, Q, F>(v: V, mut queue: Q, predicate: F)
+    where V: View<'a> + Clone, Q: Queue<V>, F: Fn(V) {
+        queue.unshift(v);
         loop {
             match queue.shift() {
                 None => return,
@@ -113,9 +113,9 @@ pub fn traverse<'a, N, Q, F>(n: N, mut queue: Q, predicate: F)
 /// called with a pointer to the current tree node. If `predicate` returns
 /// `true`, a pointer to the current tree location is returned. If `predicate`
 /// never returns `true`, `None` is returned.
-pub fn find_first<'a, N, Q, F>(n: N, mut queue: Q, predicate: F) -> Option<N>
-    where N: Nav<'a> + Clone, Q: Queue<N>, F: Fn(N) -> bool {
-        queue.unshift(n);
+pub fn find_first<'a, V, Q, F>(v: V, mut queue: Q, predicate: F) -> Option<V>
+    where V: View<'a> + Clone, Q: Queue<V>, F: Fn(V) -> bool {
+        queue.unshift(v);
         loop {
             match queue.shift() {
                 None => return None,
@@ -136,17 +136,17 @@ pub fn find_first<'a, N, Q, F>(n: N, mut queue: Q, predicate: F) -> Option<N>
     }
 
 /// Iterator closing over a tree search environment.
-pub struct FindIter<'a, N: 'a, Q, F>
-    where N: Nav<'a> + Clone, Q: Queue<N>, F: Fn(N) -> bool {
-        phantom: PhantomData<&'a N>,
+pub struct FindIter<'a, V: 'a, Q, F>
+    where V: View<'a> + Clone, Q: Queue<V>, F: Fn(V) -> bool {
+        phantom: PhantomData<&'a V>,
         predicate: F,
         queue: Q,
     }
 
-impl<'a, N: 'a, Q, F> Iterator for FindIter<'a, N, Q, F>
-    where N: Nav<'a> + Clone, Q: Queue<N>, F: Fn(N) -> bool {
-        type Item = N;
-        fn next(&mut self) -> Option<N> {
+impl<'a, V: 'a, Q, F> Iterator for FindIter<'a, V, Q, F>
+    where V: View<'a> + Clone, Q: Queue<V>, F: Fn(V) -> bool {
+        type Item = V;
+        fn next(&mut self) -> Option<V> {
             loop {
                 match self.queue.shift() {
                     None => return None,
@@ -174,8 +174,8 @@ impl<'a, N: 'a, Q, F> Iterator for FindIter<'a, N, Q, F>
 /// nodes below it in the order defined by `queue`. At each node, `predicate` is
 /// called with a pointer to the current tree node. The iterator yields only
 /// nodes for which `predicate` returned `true`.
-pub fn find_all<'a, N, Q, F>(n: N, mut queue: Q, predicate: F) -> FindIter<'a, N, Q, F>
-    where N: Nav<'a> + Clone, Q: Queue<N>, F: Fn(N) -> bool {
-        queue.unshift(n);
+pub fn find_all<'a, V, Q, F>(v: V, mut queue: Q, predicate: F) -> FindIter<'a, V, Q, F>
+    where V: View<'a> + Clone, Q: Queue<V>, F: Fn(V) -> bool {
+        queue.unshift(v);
         FindIter { phantom: PhantomData, predicate: predicate, queue: queue, }
     }
