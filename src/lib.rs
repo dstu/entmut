@@ -25,25 +25,28 @@ mod util;
 /// Navigable fixed-topology view of a tree.
 ///
 /// This trait defines a view of a tree that is analogous to a sequential
-/// iterator providing read-only pointers into a structure. At any given point
-/// in time, it can be thought of as pointing to a particular tree node. Methods
-/// are provided for walking the tree and updating which node is pointed at.
+/// iterator providing read-only pointers into a structure. At any given time,
+/// it can be thought of as pointing to a particular tree node. Methods are
+/// provided for walking the tree and updating which node is pointed at.
 ///
 /// If you have worked with
 /// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
 /// seem familiar.
 ///
-/// For access to data at tree nodes, implementing types should provide an
-/// implementation of `std::borrow::Borrow` or `std::borrow::BorrowMut`.
+/// For access to data at tree nodes, implementing types should also implement
+/// `std::borrow::Borrow` or `std::borrow::BorrowMut`.
 ///
 /// The read-only nature of this view does not guarantee immutability or thread
-/// safety. Trees with an internall internally mutable node type (like
-/// `std::cell::RefCell<T>`) may permit updates to tree data through this
-/// view. The tree topology, however, should stay fixed.
+/// safety. Implementing types may permit mutation of tree data (whether by
+/// implementing `std::borrow::BorrowMut`, implementing `std::borrow::Borrow`
+/// and having `RefCell` data, or otherwise), and the `Editor` trait, which
+/// extends this one, permits modification of the tree topology.
 ///
 /// To make it convenient to navigate through a tree and retain pointers along
 /// the way, it is recommended that implementors also provide an implementation
-/// of `std::clone::Clone`.
+/// of `std::clone::Clone`. For mutable types that also implement
+/// `std::borrow::BorrowMut`, which may require a read-write borrow of an
+/// underlying structure, this may not be possible.
 pub trait Nav {
     /// Returns the number of children of the current node.
     fn child_count(&self) -> usize;
@@ -60,7 +63,7 @@ pub trait Nav {
 
     /// Navigates to the sibling at `offset`, for which negative values indicate
     /// navigating to the left of this node's location and positive value to the
-    /// right. An offset of 0 is a no-op. Panics if this is the tree root or
+    /// right. (An offset of 0 is a no-op.) Panics if this is the tree root or
     /// `offset` resolves to a nonexistant sibling.
     fn seek_sibling(&mut self, offset: isize);
 
@@ -83,35 +86,72 @@ pub trait Nav {
     }
 }
 
+/// Navigable view of a tree, with support for modifying the tree's topology.
+///
+/// This trait defines a view of a tree that is analogous to a sequential
+/// iterator which supports insertions and deletions. It extends `Nav` by
+/// providing an interface for tree modification operations.
 pub trait Editor: Nav {
+    /// The type of tree node data, usually the `T` of some `Tree<T>`.
     type Data;
+
+    /// The tree type that is associated with operations that insert or remove
+    /// subtrees. This is typically the type of the tree being operated on.
     type Tree;
 
+    /// Creates a new leaf with the given data at the logical end of the
+    /// children of the current focus and focuses on it.
     fn push_leaf(&mut self, data: <Self as Editor>::Data);
 
+    /// Adds `child` to the logical end of the children of the current focus and
+    /// focuses on it.
     fn push_child(&mut self, child: <Self as Editor>::Tree);
 
+    /// Inserts a new leaf with the given data at the given position in the
+    /// current focus's children and focuses on it.
     fn insert_leaf(&mut self, index: usize, data: <Self as Editor>::Data);
-    
+
+    /// Inserts `child` at the given position in the current focus's children
+    /// and focuses on it.
     fn insert_child(
         &mut self, index: usize, child: <Self as Editor>::Tree);
 
+    /// Inserts a new leaf with the given data at the position an offset by the
+    /// given amount from the current focus and focuses on it. Panics if the
+    /// offset is invalid.
     fn insert_sibling_leaf(
         &mut self, offset: isize, data: <Self as Editor>::Data);
 
+    /// Inserts `sibling` at the given offset relative to the current focus and
+    /// focuses on it. Panics if the offset is invalid.
     fn insert_sibling(
         &mut self, offset: isize, sibling: <Self as Editor>::Tree);
 
+    /// Removes the focus node and returns the subtree rooted at it. Focus
+    /// changes to (in order of preference) the focus's left sibling, its right
+    /// sibling (if there is no left sibling), or its parent (if there are no
+    /// siblings).
     fn remove(&mut self) -> <Self as Editor>::Tree;
 
+    /// Removes the child at the given index and returns the subtree rooted at
+    /// it.
     fn remove_child(&mut self, index: usize) -> <Self as Editor>::Tree;
 
+    /// Removes the sibling at the given offset and returns the subtree rooted
+    /// at it.
     fn remove_sibling(&mut self, offset: isize) -> <Self as Editor>::Tree;
 
+    /// Swaps the focus node and `other`.
     fn swap(&mut self, other: &mut <Self as Editor>::Tree);
 
+    /// Swaps the children at the given indices. If the indices are equal, this
+    /// is a no-op. If either index corresponds to the focus, focus follows it
+    /// after the swap.
     fn swap_children(&mut self, index_a: usize, index_b: usize);
 
+    /// Swaps the sibling nodes at the given offsets. If the offsets are equal,
+    /// this is a no-op. If either offset is 0 (corresponding to the focus),
+    /// focus follows it after the swap.
     fn swap_siblings(&mut self, offset_a: isize, offset_b: isize);
 }
 
