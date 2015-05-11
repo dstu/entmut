@@ -22,12 +22,13 @@ pub mod traversal;
 /// Internal utilities.
 mod util;
 
-/// Navigable fixed-topology view of a tree.
+/// Navigable focus-based view of a tree.
 ///
 /// This trait defines a view of a tree that is analogous to a sequential
-/// iterator providing read-only pointers into a structure. At any given time,
-/// it can be thought of as pointing to a particular tree node. Methods are
-/// provided for walking the tree and updating which node is pointed at.
+/// iterator providing read-only pointers into a structure. It can be thought of
+/// as having a particular tree node as its focus, relative to which operations
+/// are performed.Methods are provided for walking the tree and updating which
+/// node is the focus.
 ///
 /// If you have worked with
 /// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
@@ -39,8 +40,10 @@ mod util;
 /// The read-only nature of this view does not guarantee immutability or thread
 /// safety. Implementing types may permit mutation of tree data (whether by
 /// implementing `std::borrow::BorrowMut`, implementing `std::borrow::Borrow`
-/// and having `RefCell` data, or otherwise), and the `Editor` trait, which
-/// extends this one, permits modification of the tree topology.
+/// and having `RefCell` data, or otherwise), which may in turn cause arbitrary
+/// modififixcations in the underlying representation of the tree structure, such
+/// as reallocations. The `Editor` trait, which extends this one, permits
+/// modification of the tree topology.
 ///
 /// To make it convenient to navigate through a tree and retain pointers along
 /// the way, it is recommended that implementors also provide an implementation
@@ -96,7 +99,8 @@ pub trait Editor: Nav {
     type Data;
 
     /// The tree type that is associated with operations that insert or remove
-    /// subtrees. This is typically the type of the tree being operated on.
+    /// subtrees. This is typically the implementing tree type that the `Editor`
+    /// provides a view of.
     type Tree;
 
     /// Creates a new leaf with the given data at the logical end of the
