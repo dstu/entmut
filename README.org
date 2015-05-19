@@ -10,9 +10,10 @@ planned/explored/experimented with.
 
 ** Traits
 
-| Trait             | Description                     | Tree data                        | Tree structure |
-|-------------------+---------------------------------+----------------------------------+----------------|
-| =entmut::Nav=     | Fixed-topology tree navigation. | Read-only or internally mutable. | Read-only.     |
+| Trait            | Description           |
+|------------------+-----------------------|
+| =entmut::Nav=    | Tree navigation.      |
+| =entmut::Editor= | Tree topology editor. |
 
 ** Implementations
 
