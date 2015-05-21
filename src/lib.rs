@@ -159,23 +159,6 @@ pub trait Editor: Nav {
     fn swap_siblings(&mut self, offset_a: isize, offset_b: isize);
 }
 
-// #[macro_export]
-// macro_rules! tree {
-//     ($data:expr) => ($crate::Tree::leaf($data));
-//     ($data:expr, [$($first:tt)*] $(,[$($rest:tt)*])*) =>
-//         ($crate::Tree { data: $data,
-//                         children: vec![tree![$($first)*]
-//                                        $(,tree![$($rest)*])*] });
-//     ($data:expr, ($($first:tt)*) $(,($($rest:tt)*))*) =>
-//         ($crate::Tree { data: $data,
-//                         children: vec![tree![$($first)*]
-//                                        $(,tree![$($rest)*])*] });
-//     ($data:expr, {$($first:tt)*} $(,{$($rest:tt)*})*) =>
-//         ($crate::Tree { data: $data,
-//                         children: vec![tree![$($first)*]
-//                                        $(,tree![$($rest)*])*] });
-// }
-
 // impl<'a, T: Debug + 'a, G: Guard<'a, T>> Debug for Nav<'a, Data=T, DataGuard=G> {
 //     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
 //         enum Walk<T> { Down(T), Up, };
