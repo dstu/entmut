@@ -179,3 +179,17 @@ pub fn find_all<N, Q, F>(n: N, mut queue: Q, predicate: F) -> FindIter<N, Q, F>
         queue.unshift(n);
         FindIter { phantom: PhantomData, predicate: predicate, queue: queue, }
     }
+
+// #[cfg(test)]
+// mod test {
+//     fn iter_eq<T, I, J>(i: I, j: J) -> bool
+//         where T: PartialEq, I: Iterator<Item=T>, J: Iterator<Item=T> {
+//             loop {
+//                 match (i.next(), j.next()) {
+//                     (Some(x), Some(y)) if x == y => continue,
+//                     (None, None) => return true,
+//                     _ => return false,
+//                 }
+//             }
+//         }
+// }
