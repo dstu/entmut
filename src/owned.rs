@@ -39,6 +39,10 @@ impl<T> Tree<T> {
         self.children.insert(index, child);
     }
 
+    pub fn into_parts(self) -> (T, Vec<Tree<T>>) {
+        (self.data, self.children)
+    }
+
     pub fn view<'s>(&'s self) -> TreeView<'s, T> {
         TreeView::new(self)
     }
@@ -496,5 +500,23 @@ mod test {
         let mut t = owned_tree!["a", ["b"], ["c", ["d"]], ["e"]];
         t.insert_child(2, owned_tree!["aa"]);
         assert![tree_eq(&t, &owned_tree!["a", ["b"], ["c", ["d"]], ["aa"], ["e"]])];
+    }
+
+    #[test]
+    fn leaf_into_parts() {
+        let t = owned_tree!["a"];
+        let (data, children) = t.into_parts();
+        assert_eq![data, "a"];
+        assert_eq![children.len(), 0];
+    }
+
+    #[test]
+    fn tree_into_parts() {
+        let t = owned_tree!["a", ["b"], ["c", ["d"]]];
+        let (data, children) = t.into_parts();
+        assert_eq![data, "a"];
+        assert_eq![children.len(), 2];
+        assert![tree_eq(&children[0], &owned_tree!["b"])];
+        assert![tree_eq(&children[1], &owned_tree!["c", ["d"]])];
     }
 }
