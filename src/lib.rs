@@ -22,13 +22,10 @@ pub mod traversal;
 /// Internal utilities.
 mod util;
 
-/// Navigable focus-based view of a tree.
+/// Navigable, focus-based view of a tree.
 ///
-/// This trait defines a view of a tree that is analogous to a sequential
-/// iterator providing read-only pointers into a structure. It can be thought of
-/// as having a particular tree node as its focus, relative to which operations
-/// are performed.Methods are provided for walking the tree and updating which
-/// node is the focus.
+/// This trait defines a view of a tree that is focused on a node and can be
+/// navigated to that node's parent, a sibling, or a child.
 ///
 /// If you have worked with
 /// [zippers](http://en.wikipedia.org/wiki/Zipper_(data_structure)), this should
@@ -37,19 +34,22 @@ mod util;
 /// For access to data at tree nodes, implementing types should also implement
 /// `std::borrow::Borrow` or `std::borrow::BorrowMut`.
 ///
-/// The read-only nature of this view does not guarantee immutability or thread
-/// safety. Implementing types may permit mutation of tree data (whether by
-/// implementing `std::borrow::BorrowMut`, implementing `std::borrow::Borrow`
-/// and having `RefCell` data, or otherwise), which may in turn cause arbitrary
-/// modififixcations in the underlying representation of the tree structure, such
-/// as reallocations. The `Editor` trait, which extends this one, permits
-/// modification of the tree topology.
+/// This trait does not expose methods for mutating the tree, but this does not
+/// guarantee immutability or thread safety. Implementing types may permit
+/// mutation of tree data (whether by implementing `std::borrow::BorrowMut`,
+/// implementing `std::borrow::Borrow` and having `RefCell` data, or otherwise),
+/// which may in turn cause arbitrary modififixcations in the underlying
+/// representation of the tree structure, such as reallocations. The `Editor`
+/// trait, which extends this one, permits modification of the tree topology.
+///
+/// This trait is usually implemented for borrows of some underlying tree
+/// structure.
 ///
 /// To make it convenient to navigate through a tree and retain pointers along
 /// the way, it is recommended that implementors also provide an implementation
-/// of `std::clone::Clone`. For mutable types that also implement
-/// `std::borrow::BorrowMut`, which may require a read-write borrow of an
-/// underlying structure, this may not be possible.
+/// of `std::clone::Clone` when this is possible. For mutable types that also
+/// implement `std::borrow::BorrowMut`, which may require a read-write borrow of
+/// an underlying structure, this may not be possible.
 pub trait Nav {
     /// Returns the number of children of the current node.
     fn child_count(&self) -> usize;
@@ -91,9 +91,8 @@ pub trait Nav {
 
 /// Navigable view of a tree, with support for modifying the tree's topology.
 ///
-/// This trait defines a view of a tree that is analogous to a sequential
-/// iterator which supports insertions and deletions. It extends `Nav` by
-/// providing an interface for tree modification operations.
+/// This trait extends [Nav](trait.Nav.html) with support for tree modification
+/// operations.
 pub trait Editor: Nav {
     /// The type of tree node data, usually the `T` of some `Tree<T>`.
     type Data;
