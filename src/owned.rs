@@ -432,4 +432,79 @@ mod test {
             assert![tree_eq(&t, &owned_tree!["a", ["b", ["c"]]])];
         }
     }
+
+    #[test]
+    #[should_panic]
+    fn remove_child_panics_no_children() {
+        owned_tree!["a"].remove_child(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_child_panics_bad_index() {
+        owned_tree!["a", ["b"], ["c"]].remove_child(2);
+    }
+
+    #[test]
+    fn remove_child() {
+        {
+            let mut t = owned_tree!["a", ["b"]];
+            t.remove_child(0);
+            assert![tree_eq(&t, &owned_tree!["a"])];
+        }
+        {
+            let mut t = owned_tree!["a", ["b"], ["c"]];
+            t.remove_child(0);
+            assert![tree_eq(&t, &owned_tree!["a", ["c"]])];
+            t.remove_child(0);
+            assert![tree_eq(&t, &owned_tree!["a"])];
+        }
+        {
+            let mut t = owned_tree!["a", ["b"], ["c"]];
+            t.remove_child(1);
+            assert![tree_eq(&t, &owned_tree!["a", ["b"]])];
+            t.remove_child(0);
+            assert![tree_eq(&t, &owned_tree!["a"])];
+        }   
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_child_panics_no_children() {
+        owned_tree!["a"].insert_child(1, owned_tree!["b"]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_child_panics_bad_index() {
+        owned_tree!["a", ["b"]].insert_child(2, owned_tree!["c"]);
+    }
+
+    #[test]
+    fn insert_child_at_leaf() {
+        let mut t = owned_tree!["a"];
+        t.insert_child(0, owned_tree!["b"]);
+        assert![tree_eq(&t, &owned_tree!["a", ["b"]])];
+    }
+
+    #[test]
+    fn insert_child_at_start() {
+        let mut t = owned_tree!["a", ["b"], ["c", ["d"]], ["e"]];
+        t.insert_child(0, owned_tree!["aa"]);
+        assert![tree_eq(&t, &owned_tree!["a", ["aa"], ["b"], ["c", ["d"]], ["e"]])];
+    }
+
+    #[test]
+    fn insert_child_at_end() {
+        let mut t = owned_tree!["a", ["b"], ["c", ["d"]], ["e"]];
+        t.insert_child(3, owned_tree!["aa"]);
+        assert![tree_eq(&t, &owned_tree!["a", ["b"], ["c", ["d"]], ["e"], ["aa"]])];
+    }
+
+    #[test]
+    fn insert_child_at_middle() {
+        let mut t = owned_tree!["a", ["b"], ["c", ["d"]], ["e"]];
+        t.insert_child(2, owned_tree!["aa"]);
+        assert![tree_eq(&t, &owned_tree!["a", ["b"], ["c", ["d"]], ["aa"], ["e"]])];
+    }
 }
