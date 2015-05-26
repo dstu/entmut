@@ -39,16 +39,6 @@ impl<T> Tree<T> {
         self.children.insert(index, child);
     }
 
-    // TODO: loop instead of recurring to avoid blowing the stack.
-    pub fn from_traversal<I: Iterator<Item=(T, I)>>(data: T, children: I) -> Self {
-        let mut t = Tree { data: data, children: vec![], };
-        for (child_data, child_children) in children {
-            t.children.push(Tree::from_traversal(child_data, child_children));
-        }
-        t.children.shrink_to_fit();
-        return t;
-    }
-
     pub fn view<'s>(&'s self) -> TreeView<'s, T> {
         TreeView::new(self)
     }
