@@ -3,6 +3,7 @@ use ::util::{ChildIndex, SiblingIndex};
 
 use std::borrow::{Borrow, BorrowMut};
 use std::clone::Clone;
+use std::fmt;
 use std::iter::Iterator;
 use std::ptr;
 
@@ -49,6 +50,52 @@ impl<T> Tree<T> {
 
     pub fn view_mut<'s>(&'s mut self) -> TreeViewMut<'s, T> {
         TreeViewMut::new(self)
+    }
+}
+
+impl<T: PartialEq> PartialEq<Tree<T>> for Tree<T> {
+    fn eq(&self, other: &Tree<T>) -> bool {
+        let mut x_stack = vec![self];
+        let mut y_stack = vec![other];
+        loop {
+            match (x_stack.pop(), y_stack.pop()) {
+                (None, None) => return true,
+                (Some(x), Some(y)) if x.data == y.data => {
+                    for child in x.children.iter() {
+                        x_stack.push(child);
+                    }
+                    for child in y.children.iter() {
+                        y_stack.push(child);
+                    }
+                },
+                _ => return false,
+            }
+        }
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Tree<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        enum PathElement<'a, T: 'a> {
+            Down(&'a Tree<T>),
+            Up,
+        }
+        let mut stack = vec![PathElement::Down(self), PathElement::Up];
+        loop {
+            match stack.pop() {
+                Some(PathElement::Down(t)) => {
+                    try![f.write_str("(")];
+                    try![t.data.fmt(f)];
+                    try![f.write_str(" ")];
+                    for child in t.children.iter().rev() {
+                        stack.push(PathElement::Down(child));
+                        stack.push(PathElement::Up);
+                    }
+                },
+                Some(_) => try![f.write_str(")")],
+                None => return Result::Ok(()),
+            }
+        }
     }
 }
 
@@ -353,53 +400,34 @@ macro_rules! owned_tree {
 mod test {
     use ::owned::Tree;
 
-    fn tree_eq<T>(x: &Tree<T>, y: &Tree<T>) -> bool
-        where T: PartialEq {
-            let mut x_stack = vec![x];
-            let mut y_stack = vec![y];
-            loop {
-                match (x_stack.pop(), y_stack.pop()) {
-                    (None, None) => return true,
-                    (Some(x), Some(y)) if x.data == y.data => {
-                        for child in x.children.iter() {
-                            x_stack.push(child);
-                        }
-                        for child in y.children.iter() {
-                            y_stack.push(child);
-                        }
-                    },
-                    _ => return false,
-                }
-            }
-        }
-
     #[test]
     fn eq_check() {
-        assert![tree_eq(&Tree::leaf("a"), &Tree::leaf("a"))];
-        assert![! tree_eq(&Tree::leaf("a"), &Tree::leaf("b"))];
-        assert![tree_eq(&Tree::new("a", vec![Tree::leaf("b"), Tree::leaf("c")]),
-                        &Tree::new("a", vec![Tree::leaf("b"), Tree::leaf("c")]))];
-        assert![! tree_eq(&Tree::new("a", vec![Tree::leaf("c"), Tree::leaf("b")]),
-                          &Tree::new("a", vec![Tree::leaf("b"), Tree::leaf("c")]))];
+        assert_eq![Tree::leaf("a"), Tree::leaf("a")];
+        assert![Tree::leaf("a") != Tree::leaf("b")];
+        assert_eq![Tree::new("a", vec![Tree::leaf("b"), Tree::leaf("c")]),
+                   Tree::new("a", vec![Tree::leaf("b"), Tree::leaf("c")])];
+        assert![Tree::new("a", vec![Tree::leaf("c"), Tree::leaf("b")])
+                != Tree::new("a", vec![Tree::leaf("b"), Tree::leaf("c")])];
     }
 
     #[test]
     fn leaf_literal() {
-        assert![tree_eq(&owned_tree!["a"], &Tree::leaf("a"))];
+        assert_eq![owned_tree!["a"], Tree::leaf("a")];
     }
 
     #[test]
     fn other_literal() {
-        assert![tree_eq(&owned_tree!["a", ["b"]], &Tree::new("a", vec![Tree::leaf("b")]))];
-        assert![tree_eq(&owned_tree!["a", ["b"], ["c"], ["d"]],
-                        &Tree::new("a", vec![Tree::leaf("b"),
-                                             Tree::leaf("c"),
-                                             Tree::leaf("d")]))];
-        assert![tree_eq(&owned_tree!["a", ["b", ["c", ["d"]]], ["e", ["f"]]],
-                        &Tree::new("a", vec![
-                            Tree::new("b", vec![
-                                Tree::new("c", vec![Tree::leaf("d")])]),
-                            Tree::new("e", vec![Tree::leaf("f")])]))];
+        assert_eq![owned_tree!["a", ["b"]],
+                   Tree::new("a", vec![Tree::leaf("b")])];
+        assert_eq![owned_tree!["a", ["b"], ["c"], ["d"]],
+                   Tree::new("a", vec![Tree::leaf("b"),
+                                       Tree::leaf("c"),
+                                       Tree::leaf("d")])];
+        assert_eq![owned_tree!["a", ["b", ["c", ["d"]]], ["e", ["f"]]],
+                   Tree::new("a", vec![
+                       Tree::new("b", vec![
+                           Tree::new("c", vec![Tree::leaf("d")])]),
+                       Tree::new("e", vec![Tree::leaf("f")])])];
     }
 
     #[test]
@@ -407,17 +435,17 @@ mod test {
         {
             let mut t = owned_tree!["a"];
             t.push_child(owned_tree!["b"]);
-            assert![tree_eq(&t, &owned_tree!["a", ["b"]])];
+            assert_eq![t, owned_tree!["a", ["b"]]];
         }
         {
             let mut t = owned_tree!["a", ["b"]];
             t.push_child(owned_tree!["c"]);
-            assert![tree_eq(&t, &owned_tree!["a", ["b"], ["c"]])];
+            assert_eq![t, owned_tree!["a", ["b"], ["c"]]];
         }
         {
             let mut t = owned_tree!["a", ["b"]];
             t.children[0].push_child(owned_tree!["c"]);
-            assert![tree_eq(&t, &owned_tree!["a", ["b", ["c"]]])];
+            assert_eq![t, owned_tree!["a", ["b", ["c"]]]];
         }
     }
 
@@ -438,21 +466,21 @@ mod test {
         {
             let mut t = owned_tree!["a", ["b"]];
             t.remove_child(0);
-            assert![tree_eq(&t, &owned_tree!["a"])];
+            assert_eq![t, owned_tree!["a"]];
         }
         {
             let mut t = owned_tree!["a", ["b"], ["c"]];
             t.remove_child(0);
-            assert![tree_eq(&t, &owned_tree!["a", ["c"]])];
+            assert_eq![t, owned_tree!["a", ["c"]]];
             t.remove_child(0);
-            assert![tree_eq(&t, &owned_tree!["a"])];
+            assert_eq![t, owned_tree!["a"]];
         }
         {
             let mut t = owned_tree!["a", ["b"], ["c"]];
             t.remove_child(1);
-            assert![tree_eq(&t, &owned_tree!["a", ["b"]])];
+            assert_eq![t, owned_tree!["a", ["b"]]];
             t.remove_child(0);
-            assert![tree_eq(&t, &owned_tree!["a"])];
+            assert_eq![t, owned_tree!["a"]];
         }
     }
 
@@ -472,28 +500,28 @@ mod test {
     fn insert_child_at_leaf() {
         let mut t = owned_tree!["a"];
         t.insert_child(0, owned_tree!["b"]);
-        assert![tree_eq(&t, &owned_tree!["a", ["b"]])];
+        assert_eq![t, owned_tree!["a", ["b"]]];
     }
 
     #[test]
     fn insert_child_at_start() {
         let mut t = owned_tree!["a", ["b"], ["c", ["d"]], ["e"]];
         t.insert_child(0, owned_tree!["aa"]);
-        assert![tree_eq(&t, &owned_tree!["a", ["aa"], ["b"], ["c", ["d"]], ["e"]])];
+        assert_eq![t, owned_tree!["a", ["aa"], ["b"], ["c", ["d"]], ["e"]]];
     }
 
     #[test]
     fn insert_child_at_end() {
         let mut t = owned_tree!["a", ["b"], ["c", ["d"]], ["e"]];
         t.insert_child(3, owned_tree!["aa"]);
-        assert![tree_eq(&t, &owned_tree!["a", ["b"], ["c", ["d"]], ["e"], ["aa"]])];
+        assert_eq![t, owned_tree!["a", ["b"], ["c", ["d"]], ["e"], ["aa"]]];
     }
 
     #[test]
     fn insert_child_at_middle() {
         let mut t = owned_tree!["a", ["b"], ["c", ["d"]], ["e"]];
         t.insert_child(2, owned_tree!["aa"]);
-        assert![tree_eq(&t, &owned_tree!["a", ["b"], ["c", ["d"]], ["aa"], ["e"]])];
+        assert_eq![t, owned_tree!["a", ["b"], ["c", ["d"]], ["aa"], ["e"]]];
     }
 
     #[test]
@@ -510,7 +538,7 @@ mod test {
         let (data, children) = t.into_parts();
         assert_eq![data, "a"];
         assert_eq![children.len(), 2];
-        assert![tree_eq(&children[0], &owned_tree!["b"])];
-        assert![tree_eq(&children[1], &owned_tree!["c", ["d"]])];
+        assert_eq![children[0], owned_tree!["b"]];
+        assert_eq![children[1], owned_tree!["c", ["d"]]];
     }
 }
