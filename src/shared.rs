@@ -67,8 +67,6 @@ impl<T> Clone for Tree<T> {
     }
 }
 
-
-
 impl<T: PartialEq> PartialEq<Tree<T>> for Tree<T> {
     fn eq(&self, other: &Tree<T>) -> bool {
         let mut x_stack = vec![self.clone()];
