@@ -159,31 +159,6 @@ pub trait Editor: Nav {
     fn swap_siblings(&mut self, offset_a: isize, offset_b: isize);
 }
 
-// impl<'a, T: Debug + 'a, G: Guard<'a, T>> Debug for Nav<'a, Data=T, DataGuard=G> {
-//     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-//         enum Walk<T> { Down(T), Up, };
-//         let mut stack = Vec::new();
-//         try![write!(f, "({:?}", self.data().deref())];
-//         stack.push(Walk::Up);
-//         for c in self.children.iter().rev() {
-//             stack.push(Walk::Down(c));
-//         }
-//         loop {
-//             match stack.pop() {
-//                 None => return Ok(()),
-//                 Some(Walk::Up) => try![write!(f, ")")],
-//                 Some(Walk::Down(t)) => {
-//                     try![write!(f, " ({:?}", *t.data().deref())];
-//                     stack.push(Walk::Up);
-//                     for c in t.children.iter().rev() {
-//                         stack.push(Walk::Down(c));
-//                     }
-//                 },
-//             }
-//         }
-//     }
-// }
-
 // #[cfg(test)]
 // mod test {
 //     use ::Tree;
