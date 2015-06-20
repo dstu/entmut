@@ -38,9 +38,10 @@ mod util;
 /// guarantee immutability or thread safety. Implementing types may permit
 /// mutation of tree data (whether by implementing `std::borrow::BorrowMut`,
 /// implementing `std::borrow::Borrow` and having `RefCell` data, or otherwise),
-/// which may in turn cause arbitrary modififixcations in the underlying
-/// representation of the tree structure, such as reallocations. The `Editor`
-/// trait, which extends this one, permits modification of the tree topology.
+/// which may in turn cause arbitrary modifications in the underlying
+/// representation of the tree structure (such as reallocations). The `Editor`
+/// trait, which extends this one, has explicit methods for modification of tree
+/// topology.
 ///
 /// This trait is usually implemented for borrows of some underlying tree
 /// structure.
