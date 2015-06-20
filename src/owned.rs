@@ -347,12 +347,6 @@ macro_rules! owned_tree {
     ($data:expr, [$($first:tt)*] $(,[$($rest:tt)*])*) =>
         ($crate::owned::Tree::new($data, vec![owned_tree![$($first)*]
                                               $(,owned_tree![$($rest)*])*]));
-    // ($data:expr, ($($first:tt) $(,$rest:tt)*)) =>
-    //     ($crate::Tree::new($data, vec![$crate::literal![$first]
-    //                                    $(,$crate::literal![$rest])*]));
-    // ($data:expr, {$($first:tt) $(,$rest:tt)*}) =>
-    //     ($crate::Tree::new($data, vec![$crate::literal![$first]
-    //                                    $(,$crate::literal![$rest])*]));
 }
 
 #[cfg(test)]
@@ -459,7 +453,7 @@ mod test {
             assert![tree_eq(&t, &owned_tree!["a", ["b"]])];
             t.remove_child(0);
             assert![tree_eq(&t, &owned_tree!["a"])];
-        }   
+        }
     }
 
     #[test]
