@@ -8,8 +8,8 @@
 //  - Shared-topology tree (data fixed).
 //  - Shared-data, shared-topology tree.
 
-// For std::intrinsics::unreachable.
-#![feature(core)]
+// For std::rc::try_unwrap.
+#![feature(rc_unique)]
 
 /// Fixed-layout trees with good memory locality guarantees.
 pub mod fixed;

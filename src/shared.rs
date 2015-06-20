@@ -6,6 +6,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::clone::Clone;
 use std::mem;
 use std::rc::Rc;
+use std::result::Result;
 
 struct TreeInternal<T> {
     data: T, children: RefCell<Vec<Tree<T>>>,
@@ -43,6 +44,13 @@ impl<T> Tree<T> {
 
     pub fn insert_child(&mut self, index: usize, child: Tree<T>) {
         self.internal.children.borrow_mut().insert(index, child);
+    }
+
+    pub fn into_parts(self) -> (T, Vec<Tree<T>>) {
+        match Rc::try_unwrap(self.internal) {
+            Result::Ok(internal) => (internal.data, internal.children.into_inner()),
+            _ => panic!["reference to shared tree element is not unique"],
+        }
     }
 
     pub fn view<'s>(&'s self) -> TreeView<'s, T> {
@@ -373,4 +381,186 @@ impl<'a, T: 'a> Editor for TreeEditor<'a, T> {
         }
         self.path.push((parent_children, here_index));
     }
+}
+
+#[macro_export]
+macro_rules! shared_tree {
+    ($data:expr) => ($crate::shared::Tree::leaf($data));
+    ($data:expr, [$($first:tt)*] $(,[$($rest:tt)*])*) =>
+        ($crate::shared::Tree::new($data, vec![shared_tree![$($first)*]
+                                               $(,shared_tree![$($rest)*])*]));
+}
+
+#[cfg(test)]
+mod test {
+    use ::shared::Tree;
+
+    fn tree_eq<T>(x: Tree<T>, y: Tree<T>) -> bool
+        where T: PartialEq {
+            let mut x_stack = vec![x];
+            let mut y_stack = vec![y];
+            loop {
+                match (x_stack.pop(), y_stack.pop()) {
+                    (None, None) => return true,
+                    (Some(x), Some(y)) => {
+                        if x.internal.data == y.internal.data {
+                            for child in x.internal.children.borrow().iter() {
+                                x_stack.push(child.clone());
+                            }
+                            for child in y.internal.children.borrow().iter() {
+                                y_stack.push(child.clone());
+                            }
+                        } else {
+                            return false
+                        }
+                    },
+                    _ => return false,
+                }
+            }
+        }
+
+    #[test]
+    fn eq_check() {
+        assert![tree_eq(Tree::leaf("a"), Tree::leaf("a"))];
+        assert![! tree_eq(Tree::leaf("a"), Tree::leaf("b"))];
+        assert![tree_eq(Tree::new("a", vec![Tree::leaf("b"), Tree::leaf("c")]),
+                        Tree::new("a", vec![Tree::leaf("b"), Tree::leaf("c")]))];
+    }
+
+    #[test]
+    fn macro_check() {
+        assert![tree_eq(Tree::leaf("a"), shared_tree!["a"])];
+        assert![! tree_eq(Tree::leaf("a"), shared_tree!["b"])];
+        assert![tree_eq(Tree::new("a", vec![Tree::leaf("b"), Tree::leaf("c")]),
+                        shared_tree!["a", ["b"], ["c"]])];
+    }
+
+    #[test]
+    fn leaf() {
+        let t = Tree::leaf("a");
+        assert_eq![t.internal.data, "a"];
+        assert_eq![t.internal.children.borrow().len(), 0];
+    }
+
+    #[test]
+    fn push_child() {
+        {
+            let mut t = shared_tree!["a"];
+            t.push_child(shared_tree!["b"]);
+            assert![tree_eq(t.clone(), shared_tree!["a", ["b"]])];
+        }
+        {
+            let mut t = shared_tree!["a", ["b"]];
+            t.push_child(shared_tree!["c"]);
+            assert![tree_eq(t.clone(), shared_tree!["a", ["b"], ["c"]])];
+        }
+        {
+            let t = shared_tree!["a", ["b"]];
+            t.internal.children.borrow_mut()[0].push_child(shared_tree!["c"]);
+            assert![tree_eq(t.clone(), shared_tree!["a", ["b", ["c"]]])];
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_child_panics_no_children() {
+        shared_tree!["a"].remove_child(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_child_panics_bad_index() {
+        shared_tree!["a", ["b"], ["c"]].remove_child(2);
+    }
+
+    #[test]
+    fn remove_child() {
+        {
+            let mut t = shared_tree!["a", ["b"]];
+            t.remove_child(0);
+            assert![tree_eq(t.clone(), shared_tree!["a"])];
+        }
+        {
+            let mut t = shared_tree!["a", ["b"], ["c"]];
+            t.remove_child(0);
+            assert![tree_eq(t.clone(), shared_tree!["a", ["c"]])];
+            t.remove_child(0);
+            assert![tree_eq(t.clone(), shared_tree!["a"])];
+        }
+        {
+            let mut t = shared_tree!["a", ["b"], ["c"]];
+            t.remove_child(1);
+            assert![tree_eq(t.clone(), shared_tree!["a", ["b"]])];
+            t.remove_child(0);
+            assert![tree_eq(t.clone(), shared_tree!["a"])];
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_child_panics_no_children() {
+        shared_tree!["a"].insert_child(1, shared_tree!["b"]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_child_panics_bad_index() {
+        shared_tree!["a", ["b"]].insert_child(2, shared_tree!["c"]);
+    }
+
+    #[test]
+    fn insert_child_at_leaf() {
+        let mut t = shared_tree!["a"];
+        t.insert_child(0, shared_tree!["b"]);
+        assert![tree_eq(t.clone(), shared_tree!["a", ["b"]])];
+    }
+
+    #[test]
+    fn insert_child_at_start() {
+        let mut t = shared_tree!["a", ["b"], ["c", ["d"]], ["e"]];
+        t.insert_child(0, shared_tree!["aa"]);
+        assert![tree_eq(t.clone(), shared_tree!["a", ["aa"], ["b"], ["c", ["d"]], ["e"]])];
+    }
+
+    #[test]
+    fn insert_child_at_end() {
+        let mut t = shared_tree!["a", ["b"], ["c", ["d"]], ["e"]];
+        t.insert_child(3, shared_tree!["aa"]);
+        assert![tree_eq(t.clone(), shared_tree!["a", ["b"], ["c", ["d"]], ["e"], ["aa"]])];
+    }
+
+    #[test]
+    fn insert_child_at_middle() {
+        let mut t = shared_tree!["a", ["b"], ["c", ["d"]], ["e"]];
+        t.insert_child(2, shared_tree!["aa"]);
+        assert![tree_eq(t.clone(), shared_tree!["a", ["b"], ["c", ["d"]], ["aa"], ["e"]])];
+    }
+
+    #[test]
+    fn leaf_into_parts() {
+        let t = shared_tree!["a"];
+        let (data, children) = t.into_parts();
+        assert_eq![data, "a"];
+        assert![children.is_empty()];
+    }
+
+    #[test]
+    fn tree_into_parts() {
+        let t = shared_tree!["a", ["b"], ["c", ["d"]]];
+        let (data, children) = t.into_parts();
+        assert_eq![data, "a"];
+        assert_eq![children.len(), 2];
+        assert![tree_eq(children[0].clone(), shared_tree!["b"])];
+        assert![tree_eq(children[1].clone(), shared_tree!["c", ["d"]])];
+    }
+
+    #[test]
+    #[should_panic]
+    #[allow(unused_variables)]
+    fn into_parts_panics_when_shared() {
+        let t = shared_tree!["a"];
+        let u = t.clone();
+        let _ = t.into_parts();
+    }
+
 }
