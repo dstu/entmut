@@ -4,7 +4,6 @@ use ::util::{ChildIndex, SiblingIndex};
 
 use std::borrow::{Borrow, BorrowMut};
 use std::clone::Clone;
-use std::intrinsics;
 use std::iter::Iterator;
 
 /// Fixed-layout tree with good memory locality guarantees.
@@ -121,10 +120,7 @@ pub struct TreeView<'a, T: 'a> {
 
 impl<'a, T: 'a> TreeView<'a, T> {
     fn here(&self) -> TreePosition {
-        match self.path.last() {
-            None => unsafe { intrinsics::unreachable() },
-            Some(x) => *x,
-        }
+        *self.path.last().unwrap()
     }    
 }
 
@@ -146,7 +142,7 @@ impl<'a, T: 'a> Borrow<T> for TreeView<'a, T> {
 impl<'a, T: 'a> Nav for TreeView<'a, T> {
     fn seek_sibling(&mut self, offset: isize) {
         let new_index = match self.path.pop() {
-            None => unsafe { intrinsics::unreachable() },
+            None => unreachable!(),
             Some(TreePosition::Root) => SiblingIndex::Root,
             Some(TreePosition::Nonroot(data)) => match self.here() {
                 TreePosition::Root =>
@@ -232,7 +228,7 @@ impl<'a, T: 'a> BorrowMut<T> for TreeViewMut<'a, T> {
 impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
     fn seek_sibling(&mut self, offset: isize) {
         let new_index = match self.path.pop() {
-            None => unsafe { intrinsics::unreachable() },
+            None => unreachable!(),
             Some(TreePosition::Root) => SiblingIndex::Root,
             Some(TreePosition::Nonroot(data)) => match self.here() {
                 TreePosition::Root =>
@@ -283,5 +279,15 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
     fn to_root(&mut self) {
         self.path.clear();
         self.path.push(TreePosition::Root);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ::fixed::Tree;
+    
+    #[test]
+    fn basic() {
+        Tree { data: vec![0], offsets: vec![0], children: vec![], };
     }
 }
