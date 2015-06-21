@@ -98,20 +98,28 @@ impl<T: fmt::Debug> fmt::Debug for Tree<T> {
             Down(Tree<T>),
             Up,
         }
-        let mut stack = vec![PathElement::Down(self.clone()), PathElement::Up];
+        try![f.write_str("(")];
+        try![self.internal.data.fmt(f)];
+        let mut stack = vec![];
+        for child in self.internal.children.borrow().iter().rev() {
+            stack.push(PathElement::Up);
+            stack.push(PathElement::Down(child.clone()));
+        }
         loop {
             match stack.pop() {
                 Some(PathElement::Down(t)) => {
-                    try![f.write_str("(")];
+                    try![f.write_str(" (")];
                     try![t.internal.data.fmt(f)];
-                    try![f.write_str(" ")];
                     for child in t.internal.children.borrow().iter().rev() {
-                        stack.push(PathElement::Down(child.clone()));
                         stack.push(PathElement::Up);
+                        stack.push(PathElement::Down(child.clone()));
                     }
                 },
-                Some(_) => try![f.write_str(")")],
-                None => return Result::Ok(()),
+                Some(PathElement::Up) => try![f.write_str(")")],
+                None => {
+                    try![f.write_str(")")];
+                    return Result::Ok(())
+                },
             }
         }
     }
@@ -590,4 +598,11 @@ mod test {
         let _ = t.into_parts();
     }
 
+    #[test]
+    fn debug_fmt() {
+        assert_eq!["(\"a\")", format!["{:?}", shared_tree!["a"]]];
+        assert_eq!["(\"a\" (\"b\") (\"c\"))", format!["{:?}", shared_tree!["a", ["b"], ["c"]]]];
+        assert_eq!["(\"a\" (\"b\") (\"c\" (\"d\") (\"e\")))",
+                   format!["{:?}", shared_tree!["a", ["b"], ["c", ["d"], ["e"]]]]];
+    }
 }

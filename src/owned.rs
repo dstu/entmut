@@ -80,20 +80,28 @@ impl<T: fmt::Debug> fmt::Debug for Tree<T> {
             Down(&'a Tree<T>),
             Up,
         }
-        let mut stack = vec![PathElement::Down(self), PathElement::Up];
+        try![f.write_str("(")];
+        try![self.data.fmt(f)];
+        let mut stack = vec![];
+        for child in self.children.iter().rev() {
+            stack.push(PathElement::Up);
+            stack.push(PathElement::Down(child));
+        }
         loop {
             match stack.pop() {
                 Some(PathElement::Down(t)) => {
-                    try![f.write_str("(")];
+                    try![f.write_str(" (")];
                     try![t.data.fmt(f)];
-                    try![f.write_str(" ")];
                     for child in t.children.iter().rev() {
-                        stack.push(PathElement::Down(child));
                         stack.push(PathElement::Up);
+                        stack.push(PathElement::Down(child));
                     }
                 },
-                Some(_) => try![f.write_str(")")],
-                None => return Result::Ok(()),
+                Some(PathElement::Up) => try![f.write_str(")")],
+                None => {
+                    try![f.write_str(")")];
+                    return Result::Ok(())
+                },
             }
         }
     }
@@ -540,5 +548,13 @@ mod test {
         assert_eq![children.len(), 2];
         assert_eq![children[0], owned_tree!["b"]];
         assert_eq![children[1], owned_tree!["c", ["d"]]];
+    }
+
+    #[test]
+    fn debug_fmt() {
+        assert_eq!["(\"a\")", format!["{:?}", owned_tree!["a"]]];
+        assert_eq!["(\"a\" (\"b\") (\"c\"))", format!["{:?}", owned_tree!["a", ["b"], ["c"]]]];
+        assert_eq!["(\"a\" (\"b\") (\"c\" (\"d\") (\"e\")))",
+                   format!["{:?}", owned_tree!["a", ["b"], ["c", ["d"], ["e"]]]]];
     }
 }
