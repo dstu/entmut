@@ -50,18 +50,13 @@ impl SiblingIndex {
 
     /// Unwraps the index to get its value, or panics with an error message if
     /// `self` is not `SiblingIndex::Valid`.
-    pub fn unwrap(&self) -> usize {
+    pub fn unwrap(&self) -> Result<usize, ()> {
         match self {
-            &SiblingIndex::Root =>
-                panic!["root vertex has no siblings"],
-            &SiblingIndex::Underflow =>
-                panic!["numerical underflow computing sibling offset"],
-            &SiblingIndex::Overflow =>
-                panic!["numerical overflow computing sibling offset"],
-            &SiblingIndex::OutOfRange(new_index, siblings) =>
-                panic!["cannot address sibling at index {} (only {} siblings)", new_index, siblings],
-            &SiblingIndex::Valid(new_index) =>
-                new_index,
+            &SiblingIndex::Root => Result::Err(()),
+            &SiblingIndex::Underflow => panic!["numerical underflow computing sibling offset"],
+            &SiblingIndex::Overflow => panic!["numerical overflow computing sibling offset"],
+            &SiblingIndex::OutOfRange(new_index, siblings) => Result::Err(()),
+            &SiblingIndex::Valid(new_index) => Result::Ok(new_index),
         }
     }
 }
@@ -87,11 +82,10 @@ impl ChildIndex {
 
     /// Unwraps the index to get its value, or panics with an error message if
     /// `self` is not `ChildIndex::Valid`.    
-    pub fn unwrap(&self) -> usize {
+    pub fn unwrap(&self) -> Result<usize, ()> {
         match self {
-            &ChildIndex::OutOfRange(new_index, children) =>
-                panic!["cannot address child at index {} (only {} children)", new_index, children],
-            &ChildIndex::Valid(new_index) => new_index,
+            &ChildIndex::OutOfRange(new_index, children) => Result::Err(()),
+            &ChildIndex::Valid(new_index) => Result::Ok(new_index),
         }
      }
 }

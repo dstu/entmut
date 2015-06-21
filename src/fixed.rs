@@ -140,8 +140,8 @@ impl<'a, T: 'a> Borrow<T> for TreeView<'a, T> {
 }
 
 impl<'a, T: 'a> Nav for TreeView<'a, T> {
-    fn seek_sibling(&mut self, offset: isize) {
-        let new_index = match self.path.pop() {
+    fn seek_sibling(&mut self, offset: isize) -> bool {
+        let new_index_result = match self.path.pop() {
             None => unreachable!(),
             Some(TreePosition::Root) => SiblingIndex::Root,
             Some(TreePosition::Nonroot(data)) => match self.here() {
@@ -153,25 +153,35 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
                                           offset),
             },
         }.unwrap();
-        let tree_index = match self.here() {
-            TreePosition::Root =>
-                self.tree.child_of(0, new_index),
-            TreePosition::Nonroot(data) =>
-                self.tree.child_of(data.tree_index, new_index),
-        };
-        self.path.push(TreePosition::Nonroot(
-            TreePositionData { tree_index: tree_index, parent_index: new_index, }));
+        match new_index_result {
+            Result::Ok(new_index) => {
+                let tree_index = match self.here() {
+                    TreePosition::Root =>
+                        self.tree.child_of(0, new_index),
+                    TreePosition::Nonroot(data) =>
+                        self.tree.child_of(data.tree_index, new_index),
+                };
+                self.path.push(TreePosition::Nonroot(
+                    TreePositionData { tree_index: tree_index, parent_index: new_index, }));
+                return true
+            },
+            Result::Err(()) => return false,
+        }
     }
 
-    fn seek_child(&mut self, index: usize) {
-        let new_index =
-            ChildIndex::compute(self.child_count(), index).unwrap();
-        let tree_index = match self.here() {
-            TreePosition::Root => self.tree.child_of(0, new_index),
-            TreePosition::Nonroot(data) => self.tree.child_of(data.tree_index, new_index),
-        };
-        self.path.push(TreePosition::Nonroot(
-            TreePositionData { tree_index: tree_index, parent_index: new_index, }));
+    fn seek_child(&mut self, index: usize) -> bool {
+        match ChildIndex::compute(self.child_count(), index).unwrap() {
+            Result::Ok(new_index) => {
+                let tree_index = match self.here() {
+                    TreePosition::Root => self.tree.child_of(0, new_index),
+                    TreePosition::Nonroot(data) => self.tree.child_of(data.tree_index, new_index),
+                };
+                self.path.push(TreePosition::Nonroot(
+                    TreePositionData { tree_index: tree_index, parent_index: new_index, }));
+                return true
+            },
+            Result::Err(_) => return false,
+        }
     }
 
     fn child_count(&self) -> usize {
@@ -185,9 +195,11 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
         self.path.len() == 1
     }
 
-    fn to_parent(&mut self) {
-        assert![self.path.len() <= 1, "Already at root"];
-        self.path.pop();
+    fn to_parent(&mut self) -> bool {
+        match self.path.pop() {
+            Some(_) => return true,
+            None => return false,
+        }
     }
 
     fn to_root(&mut self) {
@@ -226,8 +238,8 @@ impl<'a, T: 'a> BorrowMut<T> for TreeViewMut<'a, T> {
 }
 
 impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
-    fn seek_sibling(&mut self, offset: isize) {
-        let new_index = match self.path.pop() {
+    fn seek_sibling(&mut self, offset: isize) -> bool {
+        let new_index_result = match self.path.pop() {
             None => unreachable!(),
             Some(TreePosition::Root) => SiblingIndex::Root,
             Some(TreePosition::Nonroot(data)) => match self.here() {
@@ -239,25 +251,35 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
                                           offset),
             },
         }.unwrap();
-        let tree_index = match self.here() {
-            TreePosition::Root =>
-                self.tree.child_of(0, new_index),
-            TreePosition::Nonroot(data) =>
-                self.tree.child_of(data.tree_index, new_index),
-        };
-        self.path.push(TreePosition::Nonroot(
-            TreePositionData { tree_index: tree_index, parent_index: new_index, }));
+        match new_index_result {
+            Result::Ok(new_index) => {
+                let tree_index = match self.here() {
+                    TreePosition::Root =>
+                        self.tree.child_of(0, new_index),
+                    TreePosition::Nonroot(data) =>
+                        self.tree.child_of(data.tree_index, new_index),
+                };
+                self.path.push(TreePosition::Nonroot(
+                    TreePositionData { tree_index: tree_index, parent_index: new_index, }));
+                return true
+            },
+            Result::Err(_) => return false,
+        }
     }
 
-    fn seek_child(&mut self, index: usize) {
-        let new_index =
-            ChildIndex::compute(self.child_count(), index).unwrap();
-        let tree_index = match self.here() {
-            TreePosition::Root => self.tree.child_of(0, new_index),
-            TreePosition::Nonroot(data) => self.tree.child_of(data.tree_index, new_index),
-        };
-        self.path.push(TreePosition::Nonroot(
-            TreePositionData { tree_index: tree_index, parent_index: new_index, }));
+    fn seek_child(&mut self, index: usize) -> bool {
+        match ChildIndex::compute(self.child_count(), index).unwrap() {
+            Result::Ok(new_index) => {
+                let tree_index = match self.here() {
+                    TreePosition::Root => self.tree.child_of(0, new_index),
+                    TreePosition::Nonroot(data) => self.tree.child_of(data.tree_index, new_index),
+                };
+                self.path.push(TreePosition::Nonroot(
+                    TreePositionData { tree_index: tree_index, parent_index: new_index, }));
+                return true
+            },
+            Result::Err(_) => return false,
+        }
     }
 
     fn child_count(&self) -> usize {
@@ -271,9 +293,11 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
         self.path.len() == 1
     }
 
-    fn to_parent(&mut self) {
-        assert![self.path.len() <= 1, "already at root"];
-        self.path.pop();
+    fn to_parent(&mut self) -> bool {
+        match self.path.pop() {
+            Some(_) => return true,
+            None => return false,
+        }
     }
 
     fn to_root(&mut self) {

@@ -67,16 +67,33 @@ pub trait Nav {
 
     /// Navigates to the sibling at `offset`, for which negative values indicate
     /// navigating to the left of this node's location and positive value to the
-    /// right. (An offset of 0 is a no-op.) Panics if this is the tree root or
-    /// `offset` resolves to a nonexistant sibling.
-    fn seek_sibling(&mut self, offset: isize);
+    /// right. (An offset of 0 is a no-op.) Returns true iff `offset` resolves
+    /// to an extant sibling.
+    fn seek_sibling(&mut self, offset: isize) -> bool;
 
-    /// Navigates to the child at at the given index. Panics if there are no
-    /// children to navigate to or `index` resolves to a nonexistant child.
-    fn seek_child(&mut self, index: usize);
+    // Navigates to the leftmost sibling. This is a no-op if the focus is
+    // already at the leftmost sibling.
+    fn seek_first_sibling(&mut self) {
+        if self.to_parent() {
+            self.seek_child(0);
+        }
+    }
 
-    /// Navigates to this node's parent. Panics if this is the root.
-    fn to_parent(&mut self);
+    // Navigates to the rightmost sibling. This is a no-op if the focus is
+    // already at the rightmost sibling.
+    fn seek_last_sibling(&mut self) {
+        if self.to_parent() {
+            self.seek_child(self.child_count() - 1);
+        }
+    }
+
+    /// Navigates to the child at at the given index. Returns true iff `index`
+    /// resolves to an extant child.
+    fn seek_child(&mut self, index: usize) -> bool;
+
+    /// Navigates to this node's parent. Returns true iff the focus changes
+    /// (i.e., if `self` was not already pointing to the tree root).
+    fn to_parent(&mut self) -> bool;
 
     /// Navigates to the tree's root. If this navigator is already pointing at
     /// the tree root, this is a no-op.
@@ -113,23 +130,23 @@ pub trait Editor: Nav {
 
     /// Inserts a new leaf with the given data at the given position in the
     /// current focus's children and focuses on it.
-    fn insert_leaf(&mut self, index: usize, data: <Self as Editor>::Data);
+    fn insert_leaf(&mut self, index: usize, data: <Self as Editor>::Data) -> bool;
 
     /// Inserts `child` at the given position in the current focus's children
     /// and focuses on it.
     fn insert_child(
-        &mut self, index: usize, child: <Self as Editor>::Tree);
+        &mut self, index: usize, child: <Self as Editor>::Tree) -> bool;
 
     /// Inserts a new leaf with the given data at the position an offset by the
     /// given amount from the current focus and focuses on it. Panics if the
     /// offset is invalid.
     fn insert_sibling_leaf(
-        &mut self, offset: isize, data: <Self as Editor>::Data);
+        &mut self, offset: isize, data: <Self as Editor>::Data) -> bool;
 
     /// Inserts `sibling` at the given offset relative to the current focus and
     /// focuses on it. Panics if the offset is invalid.
     fn insert_sibling(
-        &mut self, offset: isize, sibling: <Self as Editor>::Tree);
+        &mut self, offset: isize, sibling: <Self as Editor>::Tree) -> bool;
 
     /// Removes the focus node and returns the subtree rooted at it. Focus
     /// changes to (in order of preference) the focus's left sibling, its right
@@ -139,11 +156,11 @@ pub trait Editor: Nav {
 
     /// Removes the child at the given index and returns the subtree rooted at
     /// it.
-    fn remove_child(&mut self, index: usize) -> <Self as Editor>::Tree;
+    fn remove_child(&mut self, index: usize) -> Option<<Self as Editor>::Tree>;
 
     /// Removes the sibling at the given offset and returns the subtree rooted
     /// at it.
-    fn remove_sibling(&mut self, offset: isize) -> <Self as Editor>::Tree;
+    fn remove_sibling(&mut self, offset: isize) -> Option<<Self as Editor>::Tree>;
 
     /// Swaps the focus node and `other`.
     fn swap(&mut self, other: &mut <Self as Editor>::Tree);
@@ -151,12 +168,12 @@ pub trait Editor: Nav {
     /// Swaps the children at the given indices. If the indices are equal, this
     /// is a no-op. If either index corresponds to the focus, focus follows it
     /// after the swap.
-    fn swap_children(&mut self, index_a: usize, index_b: usize);
+    fn swap_children(&mut self, index_a: usize, index_b: usize) -> bool;
 
     /// Swaps the sibling nodes at the given offsets. If the offsets are equal,
     /// this is a no-op. If either offset is 0 (corresponding to the focus),
     /// focus follows it after the swap.
-    fn swap_siblings(&mut self, offset_a: isize, offset_b: isize);
+    fn swap_siblings(&mut self, offset_a: isize, offset_b: isize) -> bool;
 }
 
 // #[cfg(test)]
