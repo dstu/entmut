@@ -2,7 +2,7 @@ use ::Nav;
 use ::traversal::Queue;
 use ::util::{ChildIndex, SiblingIndex};
 
-use std::borrow::{Borrow, BorrowMut};
+use std::ops::{Deref, DerefMut};
 use std::clone::Clone;
 use std::iter::Iterator;
 
@@ -130,8 +130,9 @@ impl<'a, T: 'a> Clone for TreeView<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Borrow<T> for TreeView<'a, T> {
-    fn borrow(&self) -> &T {
+impl<'a, T: 'a> Deref for TreeView<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &<Self as Deref>::Target {
         match self.here() {
             TreePosition::Root => &self.tree.data[0],
             TreePosition::Nonroot(data) => &self.tree.data[data.tree_index],
@@ -219,8 +220,10 @@ impl<'a, T> TreeViewMut<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Borrow<T> for TreeViewMut<'a, T> {
-    fn borrow(&self) -> &T {
+impl<'a, T: 'a> Deref for TreeViewMut<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &<Self as Deref>::Target {
         match self.here() {
             TreePosition::Root => &self.tree.data[0],
             TreePosition::Nonroot(data) => &self.tree.data[data.tree_index],
@@ -228,8 +231,8 @@ impl<'a, T: 'a> Borrow<T> for TreeViewMut<'a, T> {
     }
 }
 
-impl<'a, T: 'a> BorrowMut<T> for TreeViewMut<'a, T> {
-    fn borrow_mut(&mut self) -> &mut T {
+impl<'a, T: 'a> DerefMut for TreeViewMut<'a, T> {
+    fn deref_mut(&mut self) -> &mut <Self as Deref>::Target {
         match self.here() {
             TreePosition::Root => &mut self.tree.data[0],
             TreePosition::Nonroot(data) => &mut self.tree.data[data.tree_index],

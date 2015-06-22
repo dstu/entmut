@@ -1,7 +1,7 @@
 use ::{Editor, Nav};
 use ::util::{ChildIndex, SiblingIndex};
 
-use std::borrow::{Borrow, BorrowMut};
+use std::ops::{Deref, DerefMut};
 use std::clone::Clone;
 use std::fmt;
 use std::iter::Iterator;
@@ -124,8 +124,10 @@ impl<'a, T: 'a> Clone for TreeView<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Borrow<T> for TreeView<'a, T> {
-    fn borrow(&self) -> &T {
+impl<'a, T: 'a> Deref for TreeView<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &<Self as Deref>::Target {
         &self.here.data
     }
 }
@@ -208,14 +210,16 @@ impl<'a, T: 'a> TreeViewMut<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Borrow<T> for TreeViewMut<'a, T> {
-    fn borrow(&self) -> &T {
+impl<'a, T: 'a> Deref for TreeViewMut<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &<Self as Deref>::Target {
         &self.here().data
     }
 }
 
-impl<'a, T: 'a> BorrowMut<T> for TreeViewMut<'a, T> {
-    fn borrow_mut(&mut self) -> &mut T {
+impl<'a, T: 'a> DerefMut for TreeViewMut<'a, T> {
+    fn deref_mut(&mut self) -> &mut <Self as Deref>::Target {
         &mut self.here_mut().data
     }
 }

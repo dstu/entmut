@@ -32,12 +32,12 @@ mod util;
 /// seem familiar.
 ///
 /// For access to data at tree nodes, implementing types should also implement
-/// `std::borrow::Borrow` or `std::borrow::BorrowMut`.
+/// `std::borrow::Deref` or `std::borrow::DerefMut`.
 ///
 /// This trait does not expose methods for mutating the tree, but this does not
 /// guarantee immutability or thread safety. Implementing types may permit
-/// mutation of tree data (whether by implementing `std::borrow::BorrowMut`,
-/// implementing `std::borrow::Borrow` and having `RefCell` data, or otherwise),
+/// mutation of tree data (whether by implementing `std::borrow::DerefMut`,
+/// implementing `std::borrow::Deref` and having `RefCell` data, or otherwise),
 /// which may in turn cause arbitrary modifications in the underlying
 /// representation of the tree structure (such as reallocations). The `Editor`
 /// trait, which extends this one, has explicit methods for modification of tree
@@ -49,7 +49,7 @@ mod util;
 /// To make it convenient to navigate through a tree and retain pointers along
 /// the way, it is recommended that implementors also provide an implementation
 /// of `std::clone::Clone` when this is possible. For mutable types that also
-/// implement `std::borrow::BorrowMut`, which may require a read-write borrow of
+/// implement `std::borrow::DerefMut`, which may require a read-write borrow of
 /// an underlying structure, this may not be possible.
 pub trait Nav {
     /// Returns the number of children of the current node.
