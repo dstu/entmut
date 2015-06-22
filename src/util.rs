@@ -1,6 +1,6 @@
 use std::convert::Into;
 
-/// The result of computing the index of a tree node's sibling.
+/// The result of computing the index of a nonroot tree node's sibling.
 pub enum SiblingIndex {
     /// Numerical underflow in computing the index.
     Underflow,
@@ -71,7 +71,7 @@ impl Into<Option<usize>> for SiblingIndex {
 /// The result of computing the index of a child.
 pub enum ChildIndex {
     /// The computed index is out of range, with the second value giving the
-    /// number of children.
+    /// actual number of children.
     OutOfRange(usize, usize),
     /// A successfully computed index value.
     Valid(usize),
