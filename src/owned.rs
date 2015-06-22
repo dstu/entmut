@@ -131,26 +131,31 @@ impl<'a, T: 'a> Borrow<T> for TreeView<'a, T> {
 }
 
 impl<'a, T: 'a> Nav for TreeView<'a, T> {
-    fn seek_sibling(&mut self, offset: isize) {
-        let new_index = {
-            if self.at_root() {
-                SiblingIndex::Root
-            } else {
-                let (parent, here_index) = self.path[self.path.len() - 1];
-                SiblingIndex::compute(parent.children.len(),
-                                      here_index,
-                                      offset)
-            }
-        }.unwrap();
-        let (parent, _) = self.path.pop().unwrap();
-        self.path.push((parent, new_index));
-        self.here = &parent.children[new_index];
+    fn seek_sibling(&mut self, offset: isize) -> bool {
+        if self.at_root() {
+            return false
+        }
+        let (parent, here_index) = self.path[self.path.len() - 1];
+        match SiblingIndex::compute(parent.children.len(), here_index, offset) {
+            Some(new_index) => {
+                let (parent, _) = self.path.pop().unwrap();
+                self.path.push((parent, new_index));
+                self.here = &parent.children[new_index];
+                return true
+            },
+            None => return false,
+        }
     }
 
-    fn seek_child(&mut self, index: usize) {
-        let new_index = ChildIndex::compute(self.child_count(), index).unwrap();
-        self.path.push((self.here, new_index));
-        self.here = &self.here.children[new_index];
+    fn seek_child(&mut self, index: usize) -> bool {
+        match ChildIndex::compute(self.child_count(), index) {
+            Some(new_index) => {
+                self.path.push((self.here, new_index));
+                self.here = &self.here.children[new_index];
+                return true
+            },
+            None => return false,
+        }
     }
 
     fn child_count(&self) -> usize {
@@ -161,9 +166,14 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
         self.path.is_empty()
     }
 
-    fn to_parent(&mut self) {
-        let (parent, _) = self.path.pop().expect("already at root");
-        self.here = parent;
+    fn to_parent(&mut self) -> bool {
+        match self.path.pop() {
+            Some((parent, _)) => {
+                self.here = parent;
+                return true
+            },
+            None => return false,
+        }
     }
 
     fn to_root(&mut self) {
@@ -217,34 +227,44 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
 
     fn at_root(&self) -> bool { self.path.is_empty() }
 
-    fn seek_sibling(&mut self, offset: isize) {
-        let new_index = {
-            if self.at_root() {
-                SiblingIndex::Root
-            } else {
-                let (parent_ptr, here_index) = self.path[self.path.len() - 1];
-                let parent: &Tree<T> = unsafe { &*parent_ptr };
-                SiblingIndex::compute(parent.children.len(),
-                                      here_index,
-                                      offset)
-            }
-        }.unwrap();
-        let (parent_ptr, _) = self.path.pop().unwrap();
-        self.path.push((parent_ptr, new_index));
-        let parent: &mut Tree<T> = unsafe { &mut *parent_ptr };
-        self.here_ptr = &mut parent.children[new_index];
+    fn seek_sibling(&mut self, offset: isize) -> bool {
+        if self.at_root() {
+            return false
+        }
+        let (parent_ptr, here_index) = self.path[self.path.len() - 1];
+        let parent: &Tree<T> = unsafe { &*parent_ptr };
+        match SiblingIndex::compute(parent.children.len(), here_index, offset) {
+            Some(new_index) => {
+                let (parent_ptr, _) = self.path.pop().unwrap();
+                self.path.push((parent_ptr, new_index));
+                let parent: &mut Tree<T> = unsafe { &mut *parent_ptr };
+                self.here_ptr = &mut parent.children[new_index];
+                return true
+            },
+            None => return false,
+        }
     }
 
-    fn seek_child(&mut self, index: usize) {
-        let new_index = ChildIndex::compute(self.child_count(), index).unwrap();
-        self.path.push((self.here_ptr, new_index));
-        let t: &mut Tree<T> = unsafe { &mut *self.here_ptr };
-        self.here_ptr = &mut t.children[new_index];
+    fn seek_child(&mut self, index: usize) -> bool {
+        match ChildIndex::compute(self.child_count(), index) {
+            Some(new_index) => {
+                self.path.push((self.here_ptr, new_index));
+                let t: &mut Tree<T> = unsafe { &mut *self.here_ptr };
+                self.here_ptr = &mut t.children[new_index];
+                return true
+            },
+            None => return false,
+        }
     }
 
-    fn to_parent(&mut self) {
-        let (parent_ptr, _) = self.path.pop().expect("already at root");
-        self.here_ptr = parent_ptr;
+    fn to_parent(&mut self) -> bool {
+        match self.path.pop() {
+            Some((parent_ptr, _)) => {
+                self.here_ptr = parent_ptr;
+                return true
+            },
+            None => return false,
+        }
     }
 
     fn to_root(&mut self) {
@@ -270,39 +290,43 @@ impl<'a, T: 'a> Editor for TreeViewMut<'a, T> {
         self.here_ptr = &mut self.here_mut().children[new_child_index];
     }
 
-    fn insert_leaf(&mut self, index: usize, data: T) {
-        self.insert_child(index, Tree::leaf(data));
+    fn insert_leaf(&mut self, index: usize, data: T) -> bool {
+        self.insert_child(index, Tree::leaf(data))
     }
     
-    fn insert_child(&mut self, index: usize, child: Tree<T>) {
-        let new_index =
-            ChildIndex::compute(self.here().children.len(), index).unwrap();
-        self.here_mut().children.insert(new_index, child);
-        self.path.push((self.here_ptr, new_index));
-        self.here_ptr = &mut self.here_mut().children[new_index];
+    fn insert_child(&mut self, index: usize, child: Tree<T>) -> bool {
+        match ChildIndex::compute(self.here().children.len(), index) {
+            Some(new_index) => {
+                self.here_mut().children.insert(new_index, child);
+                self.path.push((self.here_ptr, new_index));
+                self.here_ptr = &mut self.here_mut().children[new_index];
+                return true
+            },
+            None => return false,
+        }
     }
 
-    fn insert_sibling_leaf(&mut self, offset: isize, data: T) {
-        self.insert_sibling(offset, Tree::leaf(data));
+    fn insert_sibling_leaf(&mut self, offset: isize, data: T) -> bool {
+        self.insert_sibling(offset, Tree::leaf(data))
     }
 
-    fn insert_sibling(&mut self, offset: isize, sibling: Tree<T>) {
-        let new_index = {
-            if self.at_root() {
-                SiblingIndex::Root
-            } else {
-                let (parent_ptr, here_index) = self.path[self.path.len() - 1];
-                let parent: &Tree<T> = unsafe { &*parent_ptr };
-                SiblingIndex::compute(parent.children.len(),
-                                      here_index,
-                                      offset)
-            }
-        }.unwrap();
-        let (parent_ptr, _) = self.path.pop().unwrap();
-        let parent: &mut Tree<T> = unsafe { &mut *parent_ptr };
-        parent.children.insert(new_index, sibling);
-        self.path.push((parent_ptr, new_index));
-        self.here_ptr = &mut parent.children[new_index];
+    fn insert_sibling(&mut self, offset: isize, sibling: Tree<T>) -> bool {
+        if self.at_root() {
+            return false
+        }
+        let (parent_ptr, here_index) = self.path[self.path.len() - 1];
+        let parent: &Tree<T> = unsafe { &*parent_ptr };
+        match SiblingIndex::compute(parent.children.len(), here_index, offset) {
+            Some(new_index) => {
+                let (parent_ptr, _) = self.path.pop().unwrap();
+                let parent: &mut Tree<T> = unsafe { &mut *parent_ptr };
+                parent.children.insert(new_index, sibling);
+                self.path.push((parent_ptr, new_index));
+                self.here_ptr = &mut parent.children[new_index];
+                return true
+            },
+            None => return false,
+        }
     }
 
     fn remove(&mut self) -> Tree<T> {
@@ -330,68 +354,66 @@ impl<'a, T: 'a> Editor for TreeViewMut<'a, T> {
         }
     }
 
-    fn remove_child(&mut self, index: usize) -> Tree<T> {
-        let new_index = ChildIndex::compute(self.child_count(), index).unwrap();
-        self.here_mut().children.remove(new_index)
+    fn remove_child(&mut self, index: usize) -> Option<Tree<T>> {
+        ChildIndex::compute(self.child_count(), index).map(|new_index| {
+            self.here_mut().children.remove(new_index)
+        })
     }
 
-    fn remove_sibling(&mut self, offset: isize) -> Tree<T> {
+    fn remove_sibling(&mut self, offset: isize) -> Option<Tree<T>> {
         if offset == 0 {
-            return self.remove();
+            return Some(self.remove())
         }
         let (parent_ptr, here_index) =
             self.path.pop().expect("already at root");
         let parent: &mut Tree<T> = unsafe { &mut *parent_ptr };
-        let index =
-            SiblingIndex::compute(
-                parent.children.len(), here_index, offset).unwrap();
-        let removed = parent.children.remove(index);
-        let new_index =
-            if index > here_index {
-                here_index
-            } else {
-                here_index - 1
-            };
-        self.path.push((parent_ptr, new_index));
-        self.here_ptr = &mut parent.children[new_index];
-        removed
+        SiblingIndex::compute(parent.children.len(), here_index, offset).map(|index| {
+            let removed = parent.children.remove(index);
+            let new_index =
+                if index > here_index {
+                    here_index
+                } else {
+                    here_index - 1
+                };
+            self.path.push((parent_ptr, new_index));
+            self.here_ptr = &mut parent.children[new_index];
+            removed
+        })
     }
 
     fn swap(&mut self, other: &mut Tree<T>) {
         unsafe { ptr::swap(self.here_ptr, other) };
     }
 
-    fn swap_children(&mut self, index_a: usize, index_b: usize) {
-        let new_index_a =
-            ChildIndex::compute(self.child_count(), index_a).unwrap();
-        let new_index_b =
-            ChildIndex::compute(self.child_count(), index_b).unwrap();
-        self.here_mut().children.swap(new_index_a, new_index_b);
+    fn swap_children(&mut self, index_a: usize, index_b: usize) -> bool {
+        match (ChildIndex::compute(self.child_count(), index_a),
+               ChildIndex::compute(self.child_count(), index_b)) {
+            (Some(new_index_a), Some(new_index_b)) => {
+                self.here_mut().children.swap(new_index_a, new_index_b);
+                return true
+            },
+            _ => return false,
+        }
     }
 
-    fn swap_siblings(&mut self, offset_a: isize, offset_b: isize) {
-        let index_a = {
-            if self.at_root() {
-                SiblingIndex::Root
-            } else {
-                let &(parent_ptr, here_index) = self.path.last().unwrap();
-                let parent: &mut Tree<T> = unsafe { &mut *parent_ptr };
-                SiblingIndex::compute(parent.children.len(), here_index, offset_a)
-            }
-        }.unwrap();
-        let index_b = {
-            let &(parent_ptr, here_index) = self.path.last().unwrap();
-            let parent: &mut Tree<T> = unsafe { &mut *parent_ptr };
-            SiblingIndex::compute(parent.children.len(), here_index, offset_b)
-        }.unwrap();
-
+    fn swap_siblings(&mut self, offset_a: isize, offset_b: isize) -> bool {
+        if self.at_root() {
+            return false
+        }
         let &(parent_ptr, here_index) = self.path.last().unwrap();
         let parent: &mut Tree<T> = unsafe { &mut *parent_ptr };
-        parent.children.swap(index_a, index_b);
-        if here_index == index_a {
-            self.here_ptr = &mut parent.children[index_a];
-        } else if here_index == index_b {
-            self.here_ptr = &mut parent.children[index_b];
+        match (SiblingIndex::compute(parent.children.len(), here_index, offset_a),
+               SiblingIndex::compute(parent.children.len(), here_index, offset_b)) {
+            (Some(index_a), Some(index_b)) => {
+                parent.children.swap(index_a, index_b);
+                if here_index == index_a {
+                    self.here_ptr = &mut parent.children[index_a];
+                } else if here_index == index_b {
+                    self.here_ptr = &mut parent.children[index_b];
+                }
+                return true
+            },
+            _ => return false,
         }
     }
 }

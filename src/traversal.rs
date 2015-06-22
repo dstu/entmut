@@ -106,6 +106,76 @@ pub fn traverse<T, N, Q, F>(n: N, mut queue: Q, predicate: F)
         }
     }
 
+pub fn bfs<N, F>(mut n: N, predicate: F) -> Option<N>
+    where N: Nav, F: Fn(&N) -> bool {
+        enum Breadcrumb {
+            Unvisited,
+            Visited,
+            Exhausted,
+        }
+        let mut state = Breadcrumb::Unvisited;
+        loop {
+            state = match state {
+                Breadcrumb::Unvisited =>
+                    if predicate(&n) {
+                        return Some(n)
+                    } else if n.seek_sibling(1) {
+                        Breadcrumb::Unvisited
+                    } else {
+                        n.seek_first_sibling();
+                        Breadcrumb::Visited
+                    },
+                Breadcrumb::Visited =>
+                    if n.seek_child(0) {
+                        Breadcrumb::Unvisited
+                    } else {
+                        Breadcrumb::Exhausted
+                    },
+                Breadcrumb::Exhausted =>
+                    if n.seek_sibling(1) {
+                        Breadcrumb::Unvisited
+                    } else if n.to_parent() {
+                        Breadcrumb::Exhausted
+                    } else {
+                        return None
+                    },
+            }
+        }
+    }
+
+pub fn dfs<N, F>(mut n: N, predicate: F) -> Option<N>
+    where N: Nav, F: Fn(&N) -> bool {
+        enum Breadcrumb {
+            Unvisited,
+            Exhausted,
+        }
+        let mut state = Breadcrumb::Unvisited;
+        loop {
+            state = match state {
+                Breadcrumb::Unvisited =>
+                    if predicate(&n) {
+                        return Some(n)
+                    } else if n.seek_child(0) {
+                        Breadcrumb::Unvisited
+                    } else if n.seek_sibling(1) {
+                        Breadcrumb::Unvisited
+                    } else if n.to_parent() {
+                        Breadcrumb::Exhausted
+                    } else {
+                        return None
+                    },
+                Breadcrumb::Exhausted =>
+                    if n.seek_sibling(1) {
+                        Breadcrumb::Unvisited
+                    } else if n.to_parent() {
+                        Breadcrumb::Exhausted
+                    } else {
+                        return None
+                    },
+            }
+        }
+    }
+
 /// Finds the first node in a tree matching a predicate.
 ///
 /// The search starts at the tree location `n` and proceeds through it and all
