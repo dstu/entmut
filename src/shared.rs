@@ -168,30 +168,31 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
     fn seek_sibling(&mut self, offset: isize) -> bool {
         let new_index_result = 
             match self.path.last() {
-                None => SiblingIndex::Root,
+                None => return false,
                 Some(&(ref siblings, ref index)) =>
                     SiblingIndex::compute(siblings.len(), *index, offset),
-            }.unwrap();
+            };
         match new_index_result {
-            Result::Ok(new_index) => {
+            Some(new_index) => {
                 let (siblings, _) = self.path.pop().unwrap();
                 self.path.push((siblings, new_index));
                 return true
             },
-            Result::Err(_) => return false,
+            None => return false,
         }
     }
 
     fn seek_child(&mut self, index: usize) -> bool {
-        match ChildIndex::compute(self.here().internal.children.borrow().len(), index).unwrap() {
-            Result::Ok(new_index) => {
+        let child_count = self.child_count();
+        match ChildIndex::compute(child_count, index) {
+            Some(new_index) => {
                 let children = unsafe {
                     mem::transmute(self.here().internal.children.borrow())
                 };
                 self.path.push((children, new_index));
                 return true
             },
-            Result::Err(_) => return false,
+            None => return false,
         }
     }
 
@@ -245,30 +246,31 @@ impl<'a, T: 'a> Nav for TreeEditor<'a, T> {
     fn seek_sibling(&mut self, offset: isize) -> bool {
         let new_index_result =
             match self.path.last() {
-                None => SiblingIndex::Root,
+                None => return false,
                 Some(&(ref siblings, ref index)) =>
                     SiblingIndex::compute(siblings.len(), *index, offset),
-            }.unwrap();
+            };
         match new_index_result {
-            Result::Ok(new_index) => {
+            Some(new_index) => {
                 let (siblings, _) = self.path.pop().unwrap();
                 self.path.push((siblings, new_index));
                 return true
             },
-            Result::Err(_) => return false,
+            None => return false,
         }
     }
 
     fn seek_child(&mut self, index: usize) -> bool {
-        match ChildIndex::compute(self.here().internal.children.borrow().len(), index).unwrap() {
-            Result::Ok(new_index) => {
+        let child_count = self.child_count();
+        match ChildIndex::compute(child_count, index) {
+            Some(new_index) => {
                 let children = unsafe {
                     mem::transmute(self.here().internal.children.borrow())
                 };
                 self.path.push((children, new_index));
                 return true
             },
-            Result::Err(_) => return false,
+            None => return false,
         }
     }
 
@@ -337,26 +339,26 @@ impl<'a, T: 'a> Editor for TreeEditor<'a, T> {
                 let mut children: RefMut<'a, Vec<Tree<T>>> = unsafe {
                     mem::transmute(self.root.internal.children.borrow_mut())
                 };
-                match ChildIndex::compute(children.len(), index).unwrap() {
-                    Result::Ok(new_index) => {
+                match ChildIndex::compute(children.len(), index) {
+                    Some(new_index) => {
                         children.insert(new_index, child);
                         self.path.push((children, index));
                         return true
                     },
-                    Result::Err(_) => return false,
+                    None => return false,
                 }
             },
             Some((parent_children, here_index)) => {
                 let mut children: RefMut<'a, Vec<Tree<T>>> = unsafe {
                     mem::transmute(parent_children[here_index].internal.children.borrow_mut())
                 };
-                match ChildIndex::compute(children.len(), index).unwrap() {
-                    Result::Ok(new_index) => {
+                match ChildIndex::compute(children.len(), index) {
+                    Some(new_index) => {
                         children.insert(new_index, child);
                         self.path.push((children, new_index));
                         return true
                     },
-                    Result::Err(_) => return false,
+                    None => return false,
                 }
             },
         }
@@ -369,18 +371,18 @@ impl<'a, T: 'a> Editor for TreeEditor<'a, T> {
     fn insert_sibling(&mut self, offset: isize, sibling: Tree<T>) -> bool {
         let new_index_result =
             match self.path.last() {
-                None => SiblingIndex::Root,
+                None => return false,
                 Some(&(ref siblings, ref index)) =>
                     SiblingIndex::compute(siblings.len(), *index, offset),
-            }.unwrap();
+            };
         let (mut siblings, _) = self.path.pop().unwrap();
         match new_index_result {
-            Result::Ok(new_index) => {
+            Some(new_index) => {
                 siblings.insert(new_index, sibling);
                 self.path.push((siblings, new_index));
                 return true
             },
-            Result::Err(_) => return false,
+            None => return false,
         }
     }
 
@@ -423,27 +425,24 @@ impl<'a, T: 'a> Editor for TreeEditor<'a, T> {
     fn remove_sibling(&mut self, offset: isize) -> Option<Tree<T>> {
         let index_result = {
             match self.path.last() {
-                None => SiblingIndex::Root,
+                None => None,
                 Some(&(ref parent_children, here_index)) => 
                     SiblingIndex::compute(
                         parent_children.len(), here_index, offset),
             }
-        }.unwrap();
+        };
         let (mut parent_children, here_index) = self.path.pop().unwrap();
-        match index_result {
-            Result::Ok(index) => {
-                let removed = parent_children.remove(index);
-                let new_index =
-                    if index > here_index {
-                        here_index
-                    } else {
-                        here_index - 1
-                    };
-                self.path.push((parent_children, new_index));
-                Some(removed)
-            },
-            Result::Err(_) => None,
-        }
+        index_result.map(|index| {
+            let removed = parent_children.remove(index);
+            let new_index =
+                if index > here_index {
+                    here_index
+                } else {
+                    here_index - 1
+                };
+            self.path.push((parent_children, new_index));
+            removed
+        })
     }
 
     fn swap(&mut self, other: &mut Tree<T>) {
@@ -466,20 +465,13 @@ impl<'a, T: 'a> Editor for TreeEditor<'a, T> {
     }
 
     fn swap_siblings(&mut self, offset_a: isize, offset_b: isize) -> bool {
-        let (index_a_result, index_b_result) = {
-            let (a, b) = {
-                match self.path.last() {
-                    None => (SiblingIndex::Root, SiblingIndex::Root),
-                    Some(&(ref parent_children, here_index)) =>
-                        (SiblingIndex::compute(parent_children.len(), here_index, offset_a),
-                         SiblingIndex::compute(parent_children.len(), here_index, offset_b)),
-                }
-            };
-            (a.unwrap(), b.unwrap())
-        };
-        match (index_a_result, index_b_result) {
-            (Result::Ok(index_a), Result::Ok(index_b)) => {
-                let (mut parent_children, mut here_index) = self.path.pop().unwrap();
+        if self.at_root() {
+            return false
+        }
+        let (mut parent_children, mut here_index) = self.path.pop().unwrap();
+        match (SiblingIndex::compute(parent_children.len(), here_index, offset_a),
+               SiblingIndex::compute(parent_children.len(), here_index, offset_b)) {
+            (Some(index_a), Some(index_b)) => {
                 parent_children.swap(index_a, index_b);
                 if here_index == index_a {
                     here_index = index_b;

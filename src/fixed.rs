@@ -143,7 +143,7 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
     fn seek_sibling(&mut self, offset: isize) -> bool {
         let new_index_result = match self.path.pop() {
             None => unreachable!(),
-            Some(TreePosition::Root) => SiblingIndex::Root,
+            Some(TreePosition::Root) => return false,
             Some(TreePosition::Nonroot(data)) => match self.here() {
                 TreePosition::Root =>
                     SiblingIndex::compute(self.tree.child_count(0), 0, offset),
@@ -152,9 +152,9 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
                                           data.parent_index,
                                           offset),
             },
-        }.unwrap();
+        };
         match new_index_result {
-            Result::Ok(new_index) => {
+            Some(new_index) => {
                 let tree_index = match self.here() {
                     TreePosition::Root =>
                         self.tree.child_of(0, new_index),
@@ -165,13 +165,13 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
                     TreePositionData { tree_index: tree_index, parent_index: new_index, }));
                 return true
             },
-            Result::Err(()) => return false,
+            None => return false,
         }
     }
 
     fn seek_child(&mut self, index: usize) -> bool {
-        match ChildIndex::compute(self.child_count(), index).unwrap() {
-            Result::Ok(new_index) => {
+        match ChildIndex::compute(self.child_count(), index) {
+            Some(new_index) => {
                 let tree_index = match self.here() {
                     TreePosition::Root => self.tree.child_of(0, new_index),
                     TreePosition::Nonroot(data) => self.tree.child_of(data.tree_index, new_index),
@@ -180,7 +180,7 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
                     TreePositionData { tree_index: tree_index, parent_index: new_index, }));
                 return true
             },
-            Result::Err(_) => return false,
+            None => return false,
         }
     }
 
@@ -241,7 +241,7 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
     fn seek_sibling(&mut self, offset: isize) -> bool {
         let new_index_result = match self.path.pop() {
             None => unreachable!(),
-            Some(TreePosition::Root) => SiblingIndex::Root,
+            Some(TreePosition::Root) => return false,
             Some(TreePosition::Nonroot(data)) => match self.here() {
                 TreePosition::Root =>
                     SiblingIndex::compute(self.tree.child_count(0), 0, offset),
@@ -250,9 +250,9 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
                                           data.parent_index,
                                           offset),
             },
-        }.unwrap();
+        };
         match new_index_result {
-            Result::Ok(new_index) => {
+            Some(new_index) => {
                 let tree_index = match self.here() {
                     TreePosition::Root =>
                         self.tree.child_of(0, new_index),
@@ -263,13 +263,13 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
                     TreePositionData { tree_index: tree_index, parent_index: new_index, }));
                 return true
             },
-            Result::Err(_) => return false,
+            None => return false,
         }
     }
 
     fn seek_child(&mut self, index: usize) -> bool {
-        match ChildIndex::compute(self.child_count(), index).unwrap() {
-            Result::Ok(new_index) => {
+        match ChildIndex::compute(self.child_count(), index) {
+            Some(new_index) => {
                 let tree_index = match self.here() {
                     TreePosition::Root => self.tree.child_of(0, new_index),
                     TreePosition::Nonroot(data) => self.tree.child_of(data.tree_index, new_index),
@@ -278,7 +278,7 @@ impl<'a, T: 'a> Nav for TreeViewMut<'a, T> {
                     TreePositionData { tree_index: tree_index, parent_index: new_index, }));
                 return true
             },
-            Result::Err(_) => return false,
+            None => return false,
         }
     }
 

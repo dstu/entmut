@@ -83,7 +83,8 @@ pub trait Nav {
     // already at the rightmost sibling.
     fn seek_last_sibling(&mut self) {
         if self.to_parent() {
-            self.seek_child(self.child_count() - 1);
+            let last_child_index = self.child_count() - 1;
+            self.seek_child(last_child_index);
         }
     }
 
