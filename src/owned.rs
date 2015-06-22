@@ -134,6 +134,9 @@ impl<'a, T: 'a> Deref for TreeView<'a, T> {
 
 impl<'a, T: 'a> Nav for TreeView<'a, T> {
     fn seek_sibling(&mut self, offset: isize) -> bool {
+        if offset == 0 {
+            return true
+        }
         if self.at_root() {
             return false
         }

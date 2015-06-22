@@ -10,13 +10,13 @@ use ::entmut::owned::Tree;
 
 #[test]
 #[allow(unused_variables)]
-fn nav_instantiation() {
+fn view_instantiation() {
     let t = owned_tree!["a"];
     let v = t.view();
 }
 
 #[test]
-fn nav_preserves_leaf_topology() {
+fn view_preserves_leaf_topology() {
     let t = owned_tree!["a"];
     let v = t.view();
     assert![v.at_leaf()];
@@ -25,8 +25,17 @@ fn nav_preserves_leaf_topology() {
 }
 
 #[test]
-fn nav_preserves_leaf_data() {
+fn view_preserves_leaf_data() {
     let t = owned_tree!["a"];
     let v = t.view();
     assert_eq!["a", *v];
+}
+
+#[test]
+fn view_seek_root_sibling_fails() {
+    let t = owned_tree!["a"];
+    let mut v = t.view();
+    assert![v.seek_sibling(0)];
+    assert![! v.seek_sibling(-1)];
+    assert![! v.seek_sibling(1)];
 }
