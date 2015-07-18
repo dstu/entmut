@@ -6,6 +6,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::clone::Clone;
 use std::fmt;
 use std::mem;
+use std::ops::Deref;
 use std::rc::Rc;
 use std::result::Result;
 
@@ -158,8 +159,10 @@ impl<'a, T: 'a> Clone for TreeView<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Borrow<T> for TreeView<'a, T> {
-    fn borrow(&self) -> &T {
+impl<'a, T: 'a> Deref for TreeView<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &<Self as Deref>::Target {
         &self.here().internal.data
     }
 }
