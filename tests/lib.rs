@@ -1,8 +1,7 @@
-#[macro_use(owned_tree)]
+#[macro_use(owned_tree, owned_tree)]
 extern crate entmut;
 
 use ::entmut::Nav;
-use ::entmut::owned::Tree;
 
 // This will define macros for generalized tests of Nav and Editor impls.
 // #[cfg(test)]
