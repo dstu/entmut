@@ -12,8 +12,8 @@ mod owned {
     view_tests!(owned_tree);
 }
 
-#[cfg(shared)]
+#[cfg(test)]
 #[macro_use]
-mod owned {
+mod shared {
     view_tests!(shared_tree);
 }
