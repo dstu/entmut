@@ -314,7 +314,7 @@ mod tests {
     use ::fixed::Tree;
     
     #[test]
-    fn basic() {
+    fn can_instantiate_zero_depth_tree() {
         Tree { data: vec![0], offsets: vec![0], children: vec![], };
     }
 }
