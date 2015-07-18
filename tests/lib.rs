@@ -32,10 +32,27 @@ fn view_preserves_leaf_data() {
 }
 
 #[test]
-fn view_seek_root_sibling_fails() {
+fn view_seek_root_sibling_noop_succeeds() {
     let t = owned_tree!["a"];
     let mut v = t.view();
     assert![v.seek_sibling(0)];
+}
+
+#[test]
+fn view_seek_root_sibling_fails() {
+    let t = owned_tree!["a"];
+    let mut v = t.view();
     assert![! v.seek_sibling(-1)];
     assert![! v.seek_sibling(1)];
+}
+
+#[test]
+fn view_counts_children_correctly() {
+    let t = owned_tree!["a", ["b", ["e"], ["f"]], ["c"], ["d"]];
+    let mut v = t.view();
+    assert_eq![3, v.child_count()];
+    assert![v.seek_child(0)];
+    assert_eq![2, v.child_count()];
+    assert![v.seek_sibling(1)];
+    assert_eq![0, v.child_count()];
 }
