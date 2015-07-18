@@ -88,7 +88,7 @@ pub trait Nav {
         }
     }
 
-    /// Navigates to the child at at the given index. Returns true iff `index`
+    /// Navigates to the child at the given index. Returns true iff `index`
     /// resolves to an extant child.
     fn seek_child(&mut self, index: usize) -> bool;
 
