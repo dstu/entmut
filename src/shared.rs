@@ -168,7 +168,7 @@ impl<'a, T: 'a> Nav for TreeView<'a, T> {
     fn seek_sibling(&mut self, offset: isize) -> bool {
         let new_index_result = 
             match self.path.last() {
-                None => return false,
+                None => return offset == 0,
                 Some(&(ref siblings, ref index)) =>
                     SiblingIndex::compute(siblings.len(), *index, offset),
             };
